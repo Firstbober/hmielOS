@@ -1,0 +1,12 @@
+body {
+	margin: 0 auto;
+	padding: 0 auto;
+}
+
+.generic-display {
+	height: 100vh;
+}
+
+.terminal {
+	height: 100%;
+}
