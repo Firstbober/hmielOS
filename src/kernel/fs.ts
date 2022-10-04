@@ -23,7 +23,7 @@ export type FSEntry =
 let root: FSEntryDirectory = {
 	type: FSEntryType.Directory,
 	name: '/',
-	attributes: [true, true, true],
+	attributes: [true, false, true],
 	entries: []
 };
 

@@ -1,13 +1,20 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>hmielOS</title>
-  </head>
-  <body>
-    <div id="core/display/0" class="generic-display">
-    </div>
-    <script type="module" src="/src/system.ts"></script>
-  </body>
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>hmielOS</title>
+</head>
+
+<body>
+  <div id="core/display/0" class="generic-display">
+  </div>
+  <div id="kernel/process/iframes">
+  </div>
+
+  <script type="module" src="/src/boot.ts"></script>
+  <script type="module" src="/src/system.ts"></script>
+</body>
+
 </html>

@@ -4,7 +4,6 @@ import { FitAddon } from 'xterm-addon-fit';
 
 import { getTTYElement } from './tty';
 import { fs, FSEntryAttributes, FSEntryType } from './fs';
-import { match } from '../result';
 
 function evalTerminal(term: Terminal, line: string) {
 	const commands: any = {
@@ -23,7 +22,7 @@ function evalTerminal(term: Terminal, line: string) {
 		},
 
 		'ls': (params: Array<string>) => {
-			let fh = fs.opendir('/');
+			let fh = fs.opendir(params.length > 0 ? params[0] : '/');
 
 			if (!fh.ok)
 				return term.writeln(fh.error.name);
@@ -44,6 +43,8 @@ function evalTerminal(term: Terminal, line: string) {
 					return 'Dir ';
 				if (type == FSEntryType.FunctionalFile)
 					return 'FFil';
+
+				return 'None';
 			}
 
 			for (const entry of rd.value) {
@@ -51,6 +52,29 @@ function evalTerminal(term: Terminal, line: string) {
 			}
 
 			fs.close(fh.value);
+		},
+
+		'mkdir': (params: Array<string>) => {
+			if (params.length == 0) {
+				term.writeln('Usage: mkdir [-r] <directory>');
+				return;
+			}
+
+			let recursive = false;
+			let directory = "";
+
+			if (params[0] == '-r')
+				recursive = true;
+
+			if (recursive && params.length != 2)
+				return term.writeln('Usage: mkdir [-r] <directory>')
+
+			directory = recursive ? params[1] : params[0];
+
+			let res = fs.mkdir(directory, recursive);
+			if (!res.ok) {
+				return term.writeln(res.error.name)
+			}
 		},
 
 		'help': () => {
@@ -82,7 +106,9 @@ export function startTerminalOnTTY(tty: number) {
 	fitAddon.fit();
 
 	let currentLine = '';
-	let lines = [];
+	let bufferedLine = '';
+	let currentLineIdx = 0;
+	let lines: Array<string> = [];
 
 	term.writeln('Welcome to test terminal in hmielOS!');
 	term.writeln('WARNING This input is temporary and most things are hardcoded.');
@@ -90,7 +116,7 @@ export function startTerminalOnTTY(tty: number) {
 	term.write('hmielOS v0.1.0 $ ');
 
 	term.onKey((e) => {
-		let bannedKeycodes = ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"];
+		let bannedKeycodes = ["ArrowLeft", "ArrowRight"];
 		for (const keycode of bannedKeycodes) {
 			if (e.domEvent.code == keycode)
 				return;
@@ -110,12 +136,47 @@ export function startTerminalOnTTY(tty: number) {
 			term.write('\r\n');
 
 			evalTerminal(term, currentLine);
+			lines.push(currentLine);
 			currentLine = "";
 
 			term.write('hmielOS v0.1.0 $ ');
 
 			return;
 		}
+
+		if (e.domEvent.code == "ArrowUp" && lines.length > 0 && currentLineIdx < lines.length) {
+			currentLineIdx += 1;
+			if (currentLineIdx == 1) {
+				bufferedLine = currentLine;
+			}
+
+			for (const _ of currentLine) {
+				term.write('\b \b');
+			}
+
+			currentLine = lines[lines.length - currentLineIdx];
+			term.write(currentLine);
+
+			return;
+		} else if (e.domEvent.code == "ArrowUp") return;
+
+		if (e.domEvent.code == "ArrowDown" && currentLineIdx != 0) {
+			for (const _ of currentLine) {
+				term.write('\b \b');
+			}
+
+			currentLineIdx -= 1;
+			if (currentLineIdx == 0) {
+				currentLine = bufferedLine;
+				bufferedLine = '';
+				term.write(currentLine);
+			} else {
+				currentLine = lines[lines.length - currentLineIdx];
+				term.write(currentLine);
+			}
+
+			return;
+		} else if (e.domEvent.code == "ArrowDown") return;
 
 		currentLine += e.key;
 		term.write(e.key);
