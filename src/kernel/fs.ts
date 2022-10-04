@@ -1,4 +1,6 @@
 import { Err, Ok, Result } from "../result";
+import path from "path-browserify";
+
 
 export enum FSEntryType {
 	Directory,
@@ -54,6 +56,7 @@ export namespace fs {
 	export namespace error {
 		export class NoSuchEntry extends Error { name: string = 'NoSuchEntry'; }
 		export class NoSuchFileHandle extends Error { name: string = 'NoSuchFileHandle'; }
+		export class EntryExists extends Error { name: string = 'EntryExists' }
 		// TODO Accept FSEntryType as message
 		export class InvalidEntryType extends Error { name: string = 'InvalidEntryType' }
 		export class ParentDoesntExist extends Error { name: string = 'ParentDoesntExist' }
@@ -61,8 +64,7 @@ export namespace fs {
 	}
 
 	function getEntry(path: string): Result<[FSEntry, FSEntryDirectory], [Error, FSEntryDirectory]> {
-		if (!path.startsWith('/'))
-			return Err([new error.NoSuchEntry(), root]);
+		path = path.startsWith('/') ? path : `/${path}`;
 
 		let pathElements = path.split('/');
 		pathElements.shift();
@@ -201,5 +203,46 @@ export namespace fs {
 			return Err(new error.InvalidEntryType());
 
 		return Ok((fd.entry as FSEntryDirectory).entries);
+	}
+
+	export function mkdir(dirPath: string, recursive: boolean = false, attributes: FSEntryAttributes = [true, true, true]): Result<undefined> {
+		const foundEntry = getEntry(dirPath);
+
+		if (foundEntry.ok)
+			return Err(new error.EntryExists())
+
+		if (!foundEntry.ok)
+			if (!(foundEntry.error[0] instanceof error.NoSuchEntry) && (foundEntry.error[0] instanceof error.ParentDoesntExist && !recursive))
+				return Err(foundEntry.error[0])
+
+		if(!recursive) {
+			foundEntry.error[1].entries.push({
+				type: FSEntryType.Directory,
+				name: path.basename(dirPath),
+				attributes,
+				entries: []
+			});
+			return Ok(undefined)
+		}
+
+		const elements = dirPath.startsWith("/") ? dirPath.split('/') : (`/${dirPath}`.split('/'));
+		elements.shift()
+		let newPath = '/';
+
+		for(const pel of elements) {
+			newPath = path.join(newPath, pel);
+			const foundEntry = getEntry(newPath);
+
+			if(!foundEntry.ok) {
+				foundEntry.error[1].entries.push({
+					type: FSEntryType.Directory,
+					name: pel,
+					attributes,
+					entries: []
+				});
+			}
+		}
+
+		return Ok(undefined);
 	}
 }
