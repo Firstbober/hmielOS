@@ -73,7 +73,7 @@ export async function libsysInit() {
 			let finalData = data.data;
 			finalData.shift();
 
-			v.promiseResolve([...finalData])
+			v.promiseResolve(finalData[0])
 			responsePromises.splice(data.data[0], 1);
 
 			return;
