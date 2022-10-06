@@ -1,0 +1,11 @@
+{
+  "name": "libsys",
+  "version": "1.0.0",
+  "description": "system library for hmielOS applications",
+  "main": "libsys.ts",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "firstbober",
+  "license": "LGPL-3.0"
+}

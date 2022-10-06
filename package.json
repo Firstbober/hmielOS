@@ -18,6 +18,7 @@
     "vite": "^3.1.0"
   },
   "dependencies": {
+    "libsys": "file:src/lib/libsys",
     "path-browserify": "^1.0.1",
     "xterm": "^5.0.0",
     "xterm-addon-fit": "^0.6.0"

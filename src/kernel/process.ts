@@ -1,4 +1,4 @@
-import { Ok, Result } from "../result";
+import { Err, Ok, Result } from "../result";
 
 type PID = number;
 
@@ -15,6 +15,11 @@ interface ProcessWIP extends Process {
 
 let processesWIP: Array<ProcessWIP> = [];
 let processes: Array<Process> = [];
+
+export namespace error {
+	export class ProcessError extends Error { name: string = 'ProcessError'; }
+	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
+}
 
 export function spawnProcess(url: string, parent: PID): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
@@ -36,11 +41,43 @@ export function spawnProcess(url: string, parent: PID): Result<PID> {
 		iframe,
 		processToken: uuid
 	};
+	let wipPID = processesWIP.length;
+
 	processesWIP.push({
 		...process,
 		promisedPID
 	});
 	processes.push(process);
 
+	setTimeout(() => {
+		if (processesWIP[wipPID] == undefined)
+			return;
+
+		processes.splice(promisedPID, 1);
+		processesWIP.splice(wipPID, 1);
+
+		document.getElementById('kernel/process/iframes')?.removeChild(iframe);
+		iframe.remove();
+	}, (1000) * 60);
+
 	return Ok(promisedPID);
+}
+
+export function acceptProcess(processKey: string): Result<Process, error.ProcessError> {
+	for (let i = 0; i < processesWIP.length; i++) {
+		const pW = processesWIP[i];
+
+		if (pW.processToken != processKey) {
+			continue;
+		}
+
+		processesWIP.splice(i, 1);
+		return Ok(processes[pW.promisedPID]);
+	}
+
+	return Err(new error.NoSuchProcess());
+}
+
+export function getAllProcesses(): Array<Process> {
+	return processes;
 }

@@ -4,6 +4,7 @@ import { FitAddon } from 'xterm-addon-fit';
 
 import { getTTYElement } from './tty';
 import { fs, FSEntryAttributes, FSEntryType } from './fs';
+import { getAllProcesses } from './process';
 
 function evalTerminal(term: Terminal, line: string) {
 	const commands: any = {
@@ -74,6 +75,16 @@ function evalTerminal(term: Terminal, line: string) {
 			let res = fs.mkdir(directory, recursive);
 			if (!res.ok) {
 				return term.writeln(res.error.name)
+			}
+		},
+
+		'top': () => {
+			term.writeln("PID  PPID  Path");
+
+			let processes = getAllProcesses();
+			for (let i = 0; i < processes.length; i++) {
+				const p = processes[i];
+				term.writeln(`${i}    ${p.parent}    ${p.url}`);
 			}
 		},
 

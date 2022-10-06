@@ -1,5 +1,6 @@
 import { fs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";
+import { initSyscalls } from "./kernel/syscall";
 
 /**
  * Create root directory structure
@@ -15,6 +16,12 @@ fs.mkdir('/system', true, [true, false, true]);
 fs.mkdir('/system/programs', true);
 
 fs.mkdir('/home', true, [true, true, true]);
+
+/**
+ * Init syscalls
+ */
+
+initSyscalls();
 
 /**
  * Start sysinit
