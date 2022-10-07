@@ -24,7 +24,7 @@ export namespace error {
 	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
 }
 
-export function spawnProcess(url: string, _parent: PID, fhToClone: Array<fs.FileHandle> = []): Result<PID> {
+export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<fs.FileHandle> = []): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
