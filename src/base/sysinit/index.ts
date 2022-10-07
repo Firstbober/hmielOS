@@ -1,4 +1,4 @@
-import libsys, { libsysInit } from "libsys";
+import { libsysInit } from "libsys";
 libsysInit().then(async () => {
 	console.log("WORKS!");
 });
