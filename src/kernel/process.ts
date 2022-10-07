@@ -11,15 +11,15 @@ interface Process {
 	iframe: HTMLIFrameElement,
 	processToken: string,
 
-	fileHandlers: Array<sysfs.open.Handle>
+	fileHandlers: Array<sysfs.open.Handle | undefined>
 }
 
 interface ProcessWIP extends Process {
 	promisedPID: PID
 }
 
-let processesWIP: Array<ProcessWIP> = [];
-let processes: Array<Process> = [];
+let processesWIP: Array<ProcessWIP | undefined> = [];
+let processes: Array<Process | undefined> = [];
 
 export namespace error {
 	export class ProcessError extends Error { name: string = 'ProcessError'; }
@@ -81,8 +81,8 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<sysfs.
 		if (processesWIP[wipPID] == undefined)
 			return;
 
-		processes.splice(promisedPID, 1);
-		processesWIP.splice(wipPID, 1);
+		processes[promisedPID] = undefined;
+		processesWIP[wipPID] = undefined;
 
 		document.getElementById('kernel/process/iframes')?.removeChild(iframe);
 		iframe.remove();
@@ -95,20 +95,38 @@ export function acceptProcess(processKey: string): Result<Process, error.Process
 	for (let i = 0; i < processesWIP.length; i++) {
 		const pW = processesWIP[i];
 
+		if (pW == undefined)
+			continue;
+
 		if (pW.processToken != processKey) {
 			continue;
 		}
 
 		processesWIP.splice(i, 1);
 
-		krnlfs.write(processes[pW.promisedPID].fileHandlers[1], new TextEncoder().encode('This is a message from acceptProcess!!!'), -1, 0);
+		krnlfs.write(processes[pW.promisedPID]!.fileHandlers[1]!, new TextEncoder().encode('This is a message from acceptProcess!!!'), -1, 0);
 
-		return Ok(processes[pW.promisedPID]);
+		return Ok(processes[pW.promisedPID]!);
 	}
 
 	return Err(new error.NoSuchProcess());
 }
 
-export function getAllProcesses(): Array<Process> {
-	return processes;
+export function getAllProcesses(): Array<[PID, Process]> {
+	let procs: Array<[PID, Process]> = [];
+	for (let i = 0; i < processes.length; i++) {
+		const p = processes[i];
+		if (p != undefined)
+			procs.push([i, p]);
+	}
+	return procs;
+}
+
+export function getProcessWithToken(token: string): Result<[PID, Process], error.ProcessError> {
+	for (const process of getAllProcesses()) {
+		if (process[1].processToken == token)
+			return Ok(process);
+	}
+
+	return Err(new error.NoSuchProcess());
 }

@@ -10,6 +10,7 @@ interface ResponsePromise {
 let _f_canUseSyscalls = false;
 
 let responsePromises: Array<ResponsePromise> = [];
+let processKey = "";
 
 export namespace syscall {
 	export interface Syscalls {
@@ -34,29 +35,34 @@ export namespace syscall {
 		window.parent.postMessage(message, "*");
 	}
 
+	function sendSyscall<T>(syscall: string, ...args: any[]) {
+		let rP: ResponsePromise = {
+			key: responsePromises.length
+		} as any;
+
+		let p = new Promise<T>((resolve, reject) => {
+			rP.promiseResolve = resolve;
+			rP.promiseReject = reject;
+		});
+
+		responsePromises.push(rP);
+
+		sendMessage({
+			type: 'kernel.syscall.' + syscall,
+			data: [processKey, rP.key, ...args]
+		});
+
+		return p;
+	}
+
 	export const syscalls: Syscalls = {
-		async processInit(processKey) {
-			let rP: ResponsePromise = {
-				key: responsePromises.length
-			} as any;
-
-			let p = new Promise<void>((resolve, reject) => {
-				rP.promiseResolve = resolve;
-				rP.promiseReject = reject;
-			});
-
-			responsePromises.push(rP);
-
-			sendMessage({
-				type: 'kernel.syscall.processInit',
-				data: [rP.key, processKey]
-			});
-
-			return p;
+		async processInit(_processKey) {
+			processKey = _processKey;
+			return sendSyscall('processInit', _processKey);
 		},
 
 		async open(path, accessFlag, statusFlag, type) {
-			return Ok(0);
+			return sendSyscall('open', path, accessFlag, statusFlag, type);
 		},
 		async close(handle) {
 			return true;
