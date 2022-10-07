@@ -6,9 +6,9 @@ import { getTTYElement } from './tty';
 import { fs, FSEntryAttributes, FSEntryType } from './fs';
 import { getAllProcesses } from './process';
 
-function evalTerminal(term: Terminal, line: string) {
+async function evalTerminal(term: Terminal, line: string) {
 	const commands: any = {
-		'touch': (params: Array<string>) => {
+		'touch': async (params: Array<string>) => {
 			if (params.length == 0) {
 				term.writeln('Usage: touch <filename>');
 				return;
@@ -22,7 +22,7 @@ function evalTerminal(term: Terminal, line: string) {
 			fs.close(handle.value);
 		},
 
-		'ls': (params: Array<string>) => {
+		'ls': async (params: Array<string>) => {
 			let fh = fs.opendir(params.length > 0 ? params[0] : '/');
 
 			if (!fh.ok)
@@ -55,7 +55,7 @@ function evalTerminal(term: Terminal, line: string) {
 			fs.close(fh.value);
 		},
 
-		'mkdir': (params: Array<string>) => {
+		'mkdir': async (params: Array<string>) => {
 			if (params.length == 0) {
 				term.writeln('Usage: mkdir [-r] <directory>');
 				return;
@@ -78,7 +78,7 @@ function evalTerminal(term: Terminal, line: string) {
 			}
 		},
 
-		'top': () => {
+		'top': async () => {
 			term.writeln("PID  PPID  Path");
 
 			let processes = getAllProcesses();
@@ -88,7 +88,52 @@ function evalTerminal(term: Terminal, line: string) {
 			}
 		},
 
-		'help': () => {
+		'write': async (params: Array<string>) => {
+			if(params.length < 2) {
+				return term.writeln('Usage: write <filename> <data>');
+			}
+
+			let handle = fs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, fs.FileAccessFlag.WriteOnly);
+			if (!handle.ok) {
+				term.writeln(handle.error.name);
+				return;
+			}
+
+			const ret = await fs.write(handle.value, new TextEncoder().encode(params[1]), -1, 0);
+
+			if(!ret.ok) {
+				term.writeln(ret.error.name);
+				return fs.close(handle.value);
+			}
+
+			fs.close(handle.value);
+		},
+
+		'read': async (params: Array<string>) => {
+			if(params.length < 1) {
+				return term.writeln('Usage: read <filename>');
+			}
+
+			let handle = fs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, fs.FileAccessFlag.ReadOnly);
+			if (!handle.ok) {
+				term.writeln(handle.error.name);
+				return;
+			}
+
+			const ret = await fs.read(handle.value, -1, 0);
+
+			if(!ret.ok) {
+				term.writeln(ret.error.name);
+				return fs.close(handle.value);
+			}
+
+			term.writeln(`As bytes: [${ret.value.toString()}]`);
+			term.writeln(`As text: '${new TextDecoder().decode(ret.value)}'`);
+
+			fs.close(handle.value);
+		},
+
+		'help': async () => {
 			term.writeln(Object.keys(commands).join(', '));
 		}
 	}
@@ -101,7 +146,7 @@ function evalTerminal(term: Terminal, line: string) {
 
 	let params = line.split(" ");
 	params.shift()
-	commands[command](params);
+	await commands[command](params);
 }
 
 export function startTerminalOnTTY(tty: number) {
@@ -126,7 +171,7 @@ export function startTerminalOnTTY(tty: number) {
 	term.writeln('Proper terminal will come when processes are done\n');
 	term.write('hmielOS v0.1.0 $ ');
 
-	term.onKey((e) => {
+	term.onKey(async (e) => {
 		let bannedKeycodes = ["ArrowLeft", "ArrowRight"];
 		for (const keycode of bannedKeycodes) {
 			if (e.domEvent.code == keycode)
@@ -146,7 +191,7 @@ export function startTerminalOnTTY(tty: number) {
 		if (e.domEvent.code == "Enter") {
 			term.write('\r\n');
 
-			evalTerminal(term, currentLine);
+			await evalTerminal(term, currentLine);
 			lines.push(currentLine);
 			currentLine = "";
 
