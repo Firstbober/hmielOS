@@ -72,7 +72,7 @@ console.log = async (...data: any[]) => {
 		fs.close(handle.value);
 	}
 
-	const sysinit = new URL("./base/sysinit/index.html", import.meta.url).href
+	const sysinit = "./src/base/sysinit/index.html";
 	await writeToFS('/system/programs/sysinit', createExecutableFromURL(sysinit));
 
 	/**
