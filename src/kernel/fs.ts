@@ -14,14 +14,21 @@ export type FSEntryAttributes = [boolean, boolean, boolean];
 
 export type FSEntryDirectory = { type: FSEntryType.Directory, name: string, attributes: FSEntryAttributes, entries: Array<FSEntry> };
 export type FSEntryFile = { type: FSEntryType.File, name: string, attributes: FSEntryAttributes, inOpQueue: number, data: Uint8Array };
-export type FSEntryFunctionalFile = { type: FSEntryType.FunctionalFile, name: string, attributes: FSEntryAttributes, inOpQueue: number, data: Uint8Array };
+export type FSEntryFunctionalFile = {
+	type: FSEntryType.FunctionalFile,
+	name: string,
+	attributes: FSEntryAttributes,
+	inOpQueue: number,
+	data: Uint8Array,
+	readPromiseResolver?: (value: Uint8Array | PromiseLike<Uint8Array>) => void,
+};
 
 export type FSEntry =
 	| FSEntryDirectory
 	| FSEntryFile
 	| FSEntryFunctionalFile;
 
-export let root: FSEntryDirectory = {
+let root: FSEntryDirectory = {
 	type: FSEntryType.Directory,
 	name: '/',
 	attributes: [true, false, true],
@@ -30,6 +37,7 @@ export let root: FSEntryDirectory = {
 
 interface FSFileDescriptor {
 	type: FSEntryType,
+	virtual: boolean,
 	path: string,
 	entry: FSEntry
 	accessFlag: fs.FileAccessFlag,
@@ -38,7 +46,7 @@ interface FSFileDescriptor {
 
 let fileDescriptors: Map<fs.FileHandle, FSFileDescriptor> = new Map();
 // 0/1 - read/write
-let operationQueue: Array<[boolean]> = [];
+let performingOpsOn: Map<fs.FileHandle, undefined> = new Map();
 
 export namespace fs {
 	export type FileHandle = number;
@@ -54,6 +62,12 @@ export namespace fs {
 		Normal,
 		Append,
 		Create,
+	}
+
+	export enum OpenType {
+		Normal,
+		Functional,
+		Virtual
 	}
 
 	export namespace error {
@@ -119,7 +133,7 @@ export namespace fs {
 				fileHandle = key;
 		}
 
-		return fileHandle;
+		return fileHandle + 1;
 	}
 
 	function attributesIntoFlag(attributes: FSEntryAttributes): FileAccessFlag {
@@ -145,7 +159,28 @@ export namespace fs {
 		return Ok(fd);
 	}
 
-	export function open(path: string, accessFlag: FileAccessFlag, statusFlag: FileStatusFlag = FileStatusFlag.Normal): Result<FileHandle> {
+	export function open(path: string, accessFlag: FileAccessFlag, statusFlag: FileStatusFlag = FileStatusFlag.Normal, type: OpenType = OpenType.Normal): Result<FileHandle> {
+		if (type == OpenType.Virtual) {
+			let fileHandle = getNewFileHandle()
+
+			fileDescriptors.set(fileHandle, {
+				type: FSEntryType.FunctionalFile,
+				virtual: false,
+				entry: {
+					type: FSEntryType.FunctionalFile,
+					name: 'virtual',
+					attributes: [true, true, true],
+					inOpQueue: -1,
+					data: new Uint8Array()
+				},
+				path,
+				accessFlag,
+				statusFlag
+			});
+
+			return Ok(fileHandle);
+		}
+
 		const foundEntry = getEntry(path);
 
 		if (!foundEntry.ok && statusFlag != FileStatusFlag.Create)
@@ -159,7 +194,7 @@ export namespace fs {
 			if (foundEntry.value[0].type == FSEntryType.Directory)
 				return Err(new error.IsADirectory());
 
-		if(!foundEntry.ok && statusFlag == FileStatusFlag.Create && !foundEntry.error[1].attributes[1]) {
+		if (!foundEntry.ok && statusFlag == FileStatusFlag.Create && !foundEntry.error[1].attributes[1]) {
 			return Err(new error.OperationInaccessible('write'));
 		}
 
@@ -167,7 +202,7 @@ export namespace fs {
 
 		let pathSplit = path.split('/');
 		let entry: FSEntry = foundEntry.ok ? foundEntry.value[0] : {
-			type: FSEntryType.File,
+			type: type == OpenType.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
 			name: pathSplit[pathSplit.length - 1],
 			attributes: foundEntry.error[1].attributes,
 			inOpQueue: -1,
@@ -179,7 +214,8 @@ export namespace fs {
 		}
 
 		fileDescriptors.set(fileHandle, {
-			type: foundEntry.ok ? foundEntry.value[0].type : FSEntryType.File,
+			type: foundEntry.ok ? foundEntry.value[0].type : type == OpenType.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
+			virtual: false,
 			entry,
 			path,
 			accessFlag,
@@ -203,6 +239,7 @@ export namespace fs {
 
 		fileDescriptors.set(fileHandle, {
 			type: foundEntry.ok ? foundEntry.value[0].type : FSEntryType.File,
+			virtual: false,
 			entry: foundEntry.value[0],
 			path,
 			accessFlag: attributesIntoFlag(foundEntry.value[0].attributes),
@@ -224,7 +261,7 @@ export namespace fs {
 		return Ok((fd.entry as FSEntryDirectory).entries);
 	}
 
-	export function mkdir(dirPath: string, recursive: boolean = false, attributes: FSEntryAttributes = [true, true, true]): Result<undefined> {
+	export function mkdir(dirPath: string, recursive: boolean = false, attributes: FSEntryAttributes | undefined = undefined): Result<undefined> {
 		const foundEntry = getEntry(dirPath);
 
 		if (foundEntry.ok)
@@ -234,11 +271,12 @@ export namespace fs {
 			if (!(foundEntry.error[0] instanceof error.NoSuchEntry) && (foundEntry.error[0] instanceof error.ParentDoesntExist && !recursive))
 				return Err(foundEntry.error[0])
 
+
 		if (!recursive) {
 			foundEntry.error[1].entries.push({
 				type: FSEntryType.Directory,
 				name: path.basename(dirPath),
-				attributes,
+				attributes: attributes == undefined ? foundEntry.error[1].attributes : attributes,
 				entries: []
 			});
 			return Ok(undefined)
@@ -256,7 +294,7 @@ export namespace fs {
 				foundEntry.error[1].entries.push({
 					type: FSEntryType.Directory,
 					name: pel,
-					attributes,
+					attributes: attributes == undefined ? foundEntry.error[1].attributes : attributes,
 					entries: []
 				});
 			}
@@ -265,7 +303,7 @@ export namespace fs {
 		return Ok(undefined);
 	}
 
-	async function fileOpCommon<T>(type: boolean, fh: FileHandle, callback: (entry: FSEntryFile) => Promise<Result<T>>): Promise<Result<T>> {
+	async function fileOpCommon<T, E extends FSEntry = FSEntryFile>(type: boolean, fh: FileHandle, callback: (entry: E, fd: FSFileDescriptor) => Promise<Result<T>>): Promise<Result<T>> {
 		let fd = getFileDescriptor(fh);
 		if (!fd.ok)
 			return fd;
@@ -281,22 +319,35 @@ export namespace fs {
 				return Err(new error.OperationInaccessible('read'));
 
 
-		let entry = fd.value.entry as FSEntryFile;
-		while (entry.inOpQueue != -1) {
+		let entry = fd.value.entry as FSEntry;
+		while (performingOpsOn.has(fh)) {
 			await sleep(10);
 		}
 
-		let qP = operationQueue.push([type]) - 1;
-
-		let result = await callback(entry);
-
-		operationQueue.splice(qP, 1);
-
-		return result;
+		if (entry.type != FSEntryType.FunctionalFile || type == true) {
+			performingOpsOn.set(fh, undefined);
+			let result = await callback((entry as E), fd.value);
+			performingOpsOn.delete(fh);
+			return result;
+		} else {
+			return await callback((entry as E), fd.value);
+		}
 	}
 
 	export async function read(fh: FileHandle, count: number, offset: number): Promise<Result<Uint8Array>> {
-		return await fileOpCommon(false, fh, async (entry) => {
+		return await fileOpCommon(false, fh, async (_entry) => {
+			let entry: FSEntryFile | FSEntryFunctionalFile = _entry.type == FSEntryType.File ? _entry : _entry as unknown as FSEntryFunctionalFile;
+
+			if (entry.type == FSEntryType.FunctionalFile) {
+				let writeWaiter = new Promise<Uint8Array>((res, _) => {
+					(entry as FSEntryFunctionalFile).readPromiseResolver = res;
+				});
+
+				let data = await writeWaiter;
+				(entry as FSEntryFunctionalFile).readPromiseResolver = undefined;
+				return Ok(data);
+			}
+
 			if (count + offset > entry.data.length) {
 				return Err(new error.OutOfRange());
 			}
@@ -305,10 +356,28 @@ export namespace fs {
 		});
 	}
 
-	export async function write(fh: FileHandle, buffer: Uint8Array, count: number, offset: number): Promise<Result<number>> {
-		return await fileOpCommon(true, fh, async (entry) => {
+	export async function write(fh: FileHandle, buffer: Uint8Array, count: number, offset: number, _fnRec = false): Promise<Result<number>> {
+		return await fileOpCommon(true, fh, async (_entry, _fd) => {
+			let entry: FSEntryFile | FSEntryFunctionalFile = _entry.type == FSEntryType.File ? _entry : _entry as unknown as FSEntryFunctionalFile;
+
 			let realCount = count;
 			if (count == -1) realCount = buffer.length;
+
+			if (entry.type == FSEntryType.FunctionalFile) {
+				if (!_fnRec)
+					for (const [_, v] of fileDescriptors.entries()) {
+						if (v.path == _fd.path) {
+							return write(_, buffer, count, offset, true);
+						}
+					}
+
+				if (entry.readPromiseResolver) {
+					entry.readPromiseResolver(buffer.slice(0, realCount));
+					return Ok(realCount)
+				}
+
+				return Ok(0);
+			}
 
 			if (offset + realCount > entry.data.length) {
 				let newData = new Uint8Array(offset + realCount);

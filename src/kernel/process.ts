@@ -1,4 +1,5 @@
 import { Err, Ok, Result } from "../result";
+import { fs } from "./fs";
 
 type PID = number;
 
@@ -6,7 +7,9 @@ interface Process {
 	parent: PID,
 	url: string,
 	iframe: HTMLIFrameElement,
-	processToken: string
+	processToken: string,
+
+	fileHandlers: Array<fs.FileHandle>
 }
 
 interface ProcessWIP extends Process {
@@ -21,7 +24,7 @@ export namespace error {
 	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
 }
 
-export function spawnProcess(url: string, parent: PID): Result<PID> {
+export function spawnProcess(url: string, _parent: PID, fhToClone: Array<fs.FileHandle> = []): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
@@ -35,13 +38,36 @@ export function spawnProcess(url: string, parent: PID): Result<PID> {
 	iframe.id = `kernel/process/iframes/${promisedPID}`;
 	document.getElementById('kernel/process/iframes')?.appendChild(iframe);
 
-	let process = {
+	const parent = processes.at(_parent) != undefined ? _parent : -1;
+
+	let process: Process = {
 		parent,
 		url,
 		iframe,
-		processToken: uuid
+		processToken: uuid,
+		fileHandlers: []
 	};
 	let wipPID = processesWIP.length;
+
+	if (parent != -1) {
+		// TODO
+	} else {
+		const stdin: Result<number> = fs.open('stdin', fs.FileAccessFlag.ReadWrite, undefined, fs.OpenType.Virtual);
+		if (!stdin.ok)
+			return stdin;
+
+		const stdout: Result<number> = fs.open('/system/devices/tty/0', fs.FileAccessFlag.WriteOnly, undefined, fs.OpenType.Virtual);
+		if (!stdout.ok)
+			return stdout;
+
+		const stderr: number = stdout.value;
+
+		process.fileHandlers.push(stdin.value);
+		process.fileHandlers.push(stdout.value);
+		process.fileHandlers.push(stderr);
+	}
+
+	// TODO: Add file handler cloning
 
 	processesWIP.push({
 		...process,
@@ -72,6 +98,10 @@ export function acceptProcess(processKey: string): Result<Process, error.Process
 		}
 
 		processesWIP.splice(i, 1);
+
+		// TODO: Add syscalls for fs
+		fs.write(processes[pW.promisedPID].fileHandlers[1], new TextEncoder().encode('This is a message from acceptProcess!!!'), -1, 0);
+
 		return Ok(processes[pW.promisedPID]);
 	}
 

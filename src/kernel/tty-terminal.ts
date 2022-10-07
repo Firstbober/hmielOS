@@ -3,7 +3,7 @@ import 'xterm/css/xterm.css';
 import { FitAddon } from 'xterm-addon-fit';
 
 import { getTTYElement } from './tty';
-import { fs, FSEntryAttributes, FSEntryType, root } from './fs';
+import { fs, FSEntryAttributes, FSEntryType } from './fs';
 import { getAllProcesses } from './process';
 
 async function evalTerminal(term: Terminal, line: string) {
@@ -100,7 +100,6 @@ async function evalTerminal(term: Terminal, line: string) {
 			}
 
 			const ret = await fs.write(handle.value, new TextEncoder().encode(params[1]), -1, 0);
-			console.log(root);
 
 			if(!ret.ok) {
 				term.writeln(ret.error.name);
