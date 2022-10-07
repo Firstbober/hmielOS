@@ -1,4 +1,5 @@
-import { Err, Ok, Result } from "../result";
+import { sysfs } from "libsys/fs";
+import { Err, Ok, Result } from "libsys/result";
 import path from "path-browserify";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -40,36 +41,15 @@ interface FSFileDescriptor {
 	virtual: boolean,
 	path: string,
 	entry: FSEntry
-	accessFlag: fs.FileAccessFlag,
-	statusFlag: fs.FileStatusFlag
+	accessFlag: sysfs.open.AccessFlag,
+	statusFlag: sysfs.open.StatusFlag
 }
 
-let fileDescriptors: Map<fs.FileHandle, FSFileDescriptor> = new Map();
+let fileDescriptors: Map<sysfs.open.Handle, FSFileDescriptor> = new Map();
 // 0/1 - read/write
-let performingOpsOn: Map<fs.FileHandle, undefined> = new Map();
+let performingOpsOn: Map<sysfs.open.Handle, undefined> = new Map();
 
-export namespace fs {
-	export type FileHandle = number;
-
-	export enum FileAccessFlag {
-		None,
-		ReadOnly,
-		WriteOnly,
-		ReadWrite
-	}
-
-	export enum FileStatusFlag {
-		Normal,
-		Append,
-		Create,
-	}
-
-	export enum OpenType {
-		Normal,
-		Functional,
-		Virtual
-	}
-
+export namespace krnlfs {
 	export namespace error {
 		export class NoSuchEntry extends Error { name: string = 'NoSuchEntry'; }
 		export class NoSuchFileHandle extends Error { name: string = 'NoSuchFileHandle'; }
@@ -126,7 +106,7 @@ export namespace fs {
 		return Err([new error.NoSuchEntry(), currentDirectory]);
 	}
 
-	function getNewFileHandle(): FileHandle {
+	function getNewFileHandle(): sysfs.open.Handle {
 		let fileHandle = 0;
 		for (const [key, _] of fileDescriptors) {
 			if (key > fileHandle)
@@ -136,22 +116,22 @@ export namespace fs {
 		return fileHandle + 1;
 	}
 
-	function attributesIntoFlag(attributes: FSEntryAttributes): FileAccessFlag {
+	function attributesIntoFlag(attributes: FSEntryAttributes): sysfs.open.AccessFlag {
 		let read, write = [attributes[0], attributes[1]];
 
 		if (read && write)
-			return FileAccessFlag.ReadWrite
+			return sysfs.open.AccessFlag.ReadWrite
 
 		if (read)
-			return FileAccessFlag.ReadOnly
+			return sysfs.open.AccessFlag.ReadOnly
 
 		if (write)
-			return FileAccessFlag.WriteOnly
+			return sysfs.open.AccessFlag.WriteOnly
 
-		return FileAccessFlag.None
+		return sysfs.open.AccessFlag.None
 	}
 
-	function getFileDescriptor(fh: FileHandle): Result<FSFileDescriptor> {
+	function getFileDescriptor(fh: sysfs.open.Handle): Result<FSFileDescriptor> {
 		if (!fileDescriptors.has(fh))
 			return Err(new error.NoSuchFileHandle());
 
@@ -159,8 +139,8 @@ export namespace fs {
 		return Ok(fd);
 	}
 
-	export function open(path: string, accessFlag: FileAccessFlag, statusFlag: FileStatusFlag = FileStatusFlag.Normal, type: OpenType = OpenType.Normal): Result<FileHandle> {
-		if (type == OpenType.Virtual) {
+	export function open(path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag = sysfs.open.StatusFlag.Normal, type: sysfs.open.Type = sysfs.open.Type.Normal): Result<sysfs.open.Handle> {
+		if (type == sysfs.open.Type.Virtual) {
 			let fileHandle = getNewFileHandle()
 
 			fileDescriptors.set(fileHandle, {
@@ -183,7 +163,7 @@ export namespace fs {
 
 		const foundEntry = getEntry(path);
 
-		if (!foundEntry.ok && statusFlag != FileStatusFlag.Create)
+		if (!foundEntry.ok && statusFlag != sysfs.open.StatusFlag.Create)
 			return Err(foundEntry.error[0]);
 
 		if (!foundEntry.ok)
@@ -194,7 +174,7 @@ export namespace fs {
 			if (foundEntry.value[0].type == FSEntryType.Directory)
 				return Err(new error.IsADirectory());
 
-		if (!foundEntry.ok && statusFlag == FileStatusFlag.Create && !foundEntry.error[1].attributes[1]) {
+		if (!foundEntry.ok && statusFlag == sysfs.open.StatusFlag.Create && !foundEntry.error[1].attributes[1]) {
 			return Err(new error.OperationInaccessible('write'));
 		}
 
@@ -202,19 +182,19 @@ export namespace fs {
 
 		let pathSplit = path.split('/');
 		let entry: FSEntry = foundEntry.ok ? foundEntry.value[0] : {
-			type: type == OpenType.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
+			type: type == sysfs.open.Type.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
 			name: pathSplit[pathSplit.length - 1],
 			attributes: foundEntry.error[1].attributes,
 			inOpQueue: -1,
 			data: new Uint8Array(0)
 		};
 
-		if (!foundEntry.ok && statusFlag == FileStatusFlag.Create) {
+		if (!foundEntry.ok && statusFlag == sysfs.open.StatusFlag.Create) {
 			foundEntry.error[1].entries.push(entry);
 		}
 
 		fileDescriptors.set(fileHandle, {
-			type: foundEntry.ok ? foundEntry.value[0].type : type == OpenType.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
+			type: foundEntry.ok ? foundEntry.value[0].type : type == sysfs.open.Type.Functional ? FSEntryType.FunctionalFile : FSEntryType.File,
 			virtual: false,
 			entry,
 			path,
@@ -225,11 +205,11 @@ export namespace fs {
 		return Ok(fileHandle);
 	}
 
-	export function close(fh: FileHandle): boolean {
+	export function close(fh: sysfs.open.Handle): boolean {
 		return fileDescriptors.delete(fh);
 	}
 
-	export function opendir(path: string): Result<FileHandle> {
+	export function opendir(path: string): Result<sysfs.open.Handle> {
 		const foundEntry = getEntry(path);
 
 		if (!foundEntry.ok)
@@ -243,13 +223,13 @@ export namespace fs {
 			entry: foundEntry.value[0],
 			path,
 			accessFlag: attributesIntoFlag(foundEntry.value[0].attributes),
-			statusFlag: FileStatusFlag.Normal
+			statusFlag: sysfs.open.StatusFlag.Normal
 		});
 
 		return Ok(fileHandle);
 	}
 
-	export function readdir(fh: FileHandle): Result<Array<FSEntry>> {
+	export function readdir(fh: sysfs.open.Handle): Result<Array<FSEntry>> {
 		if (!fileDescriptors.has(fh))
 			return Err(new error.NoSuchFileHandle());
 
@@ -303,7 +283,7 @@ export namespace fs {
 		return Ok(undefined);
 	}
 
-	async function fileOpCommon<T, E extends FSEntry = FSEntryFile>(type: boolean, fh: FileHandle, callback: (entry: E, fd: FSFileDescriptor) => Promise<Result<T>>): Promise<Result<T>> {
+	async function fileOpCommon<T, E extends FSEntry = FSEntryFile>(type: boolean, fh: sysfs.open.Handle, callback: (entry: E, fd: FSFileDescriptor) => Promise<Result<T>>): Promise<Result<T>> {
 		let fd = getFileDescriptor(fh);
 		if (!fd.ok)
 			return fd;
@@ -334,7 +314,7 @@ export namespace fs {
 		}
 	}
 
-	export async function read(fh: FileHandle, count: number, offset: number): Promise<Result<Uint8Array>> {
+	export async function read(fh: sysfs.open.Handle, count: number, offset: number): Promise<Result<Uint8Array>> {
 		return await fileOpCommon(false, fh, async (_entry) => {
 			let entry: FSEntryFile | FSEntryFunctionalFile = _entry.type == FSEntryType.File ? _entry : _entry as unknown as FSEntryFunctionalFile;
 
@@ -356,7 +336,7 @@ export namespace fs {
 		});
 	}
 
-	export async function write(fh: FileHandle, buffer: Uint8Array, count: number, offset: number, _fnRec = false): Promise<Result<number>> {
+	export async function write(fh: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number, _fnRec = false): Promise<Result<number>> {
 		return await fileOpCommon(true, fh, async (_entry, _fd) => {
 			let entry: FSEntryFile | FSEntryFunctionalFile = _entry.type == FSEntryType.File ? _entry : _entry as unknown as FSEntryFunctionalFile;
 

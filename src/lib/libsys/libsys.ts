@@ -1,20 +1,5 @@
-let _f_canUseSyscalls = false;
-
-export interface Syscalls {
-	processInit: (processKey: string) => Promise<void>
-}
-
-export interface SyscallPacket {
-	type: string,
-	data: Array<any>
-}
-
-function sendMessage(message: SyscallPacket) {
-	if (!_f_canUseSyscalls)
-		throw new Error("Cannot use syscalls, process isn't attached to hmielOS.");
-
-	window.parent.postMessage(message, "*");
-}
+import { sysfs } from "./fs";
+import { Ok, Result } from "./result";
 
 interface ResponsePromise {
 	promiseResolve: (value: any | PromiseLike<any>) => void,
@@ -22,29 +7,70 @@ interface ResponsePromise {
 	key: number
 }
 
+let _f_canUseSyscalls = false;
+
 let responsePromises: Array<ResponsePromise> = [];
 
-const syscalls: Syscalls = {
-	async processInit(processKey) {
-		let rP: ResponsePromise = {
-			key: responsePromises.length
-		} as any;
+export namespace syscall {
+	export interface Syscalls {
+		processInit: (processKey: string) => Promise<void>,
 
-		let p = new Promise<void>((resolve, reject) => {
-			rP.promiseResolve = resolve;
-			rP.promiseReject = reject;
-		});
+		open: (path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag, type: sysfs.open.Type) => Promise<Result<sysfs.open.Handle>>,
+		close: (handle: sysfs.open.Handle) => Promise<boolean>,
 
-		responsePromises.push(rP);
+		read: (handle: sysfs.open.Handle, count: number, offset: number) => Promise<Result<Uint8Array>>,
+		write: (handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) => Promise<Result<number>>,
+	}
 
-		sendMessage({
-			type: 'kernel.syscall.processInit',
-			data: [rP.key, processKey]
-		});
+	export interface Packet {
+		type: string,
+		data: Array<any>
+	}
 
-		return p;
-	},
-};
+	function sendMessage(message: Packet) {
+		if (!_f_canUseSyscalls)
+			throw new Error("Cannot use syscalls, process isn't attached to hmielOS.");
+
+		window.parent.postMessage(message, "*");
+	}
+
+	export const syscalls: Syscalls = {
+		async processInit(processKey) {
+			let rP: ResponsePromise = {
+				key: responsePromises.length
+			} as any;
+
+			let p = new Promise<void>((resolve, reject) => {
+				rP.promiseResolve = resolve;
+				rP.promiseReject = reject;
+			});
+
+			responsePromises.push(rP);
+
+			sendMessage({
+				type: 'kernel.syscall.processInit',
+				data: [rP.key, processKey]
+			});
+
+			return p;
+		},
+
+		async open(path, accessFlag, statusFlag, type) {
+			return Ok(0);
+		},
+		async close(handle) {
+			return true;
+		},
+
+		async read(handle: sysfs.open.Handle, count: number, offset: number) {
+			return Ok(new Uint8Array());
+		},
+
+		async write(handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) {
+			return Ok(0);
+		},
+	};
+}
 
 export async function libsysInit() {
 	const prockey = (new Proxy(new URLSearchParams(window.location.search), {
@@ -60,14 +86,14 @@ export async function libsysInit() {
 		if (td.type == undefined && td.data == undefined)
 			return;
 
-		const data: SyscallPacket = td;
+		const data: syscall.Packet = td;
 
 		if (data.type.startsWith('kernel.syscall')) {
 			let v = responsePromises.at(data.data[0]);
-			if(v == undefined)
+			if (v == undefined)
 				return;
 
-			if(v.key != data.data[0])
+			if (v.key != data.data[0])
 				return;
 
 			let finalData = data.data;
@@ -81,7 +107,7 @@ export async function libsysInit() {
 	})
 
 	_f_canUseSyscalls = true;
-	await syscalls.processInit(prockey);
+	await syscall.syscalls.processInit(prockey);
 }
 
-export default syscalls;
+export default syscall.syscalls;

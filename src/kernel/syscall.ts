@@ -1,7 +1,8 @@
 import { acceptProcess } from "./process"
-import { SyscallPacket, Syscalls } from 'libsys';
+import { syscall } from 'libsys';
+import { Ok } from "libsys/result";
 
-const syscalls: Syscalls = {
+const syscalls: syscall.Syscalls = {
 	async processInit(processKey) {
 		const p = acceptProcess(processKey);
 
@@ -10,10 +11,26 @@ const syscalls: Syscalls = {
 			data: [this]
 		}, '*');
 	},
+
+	async open(path, accessFlag, statusFlag, type) {
+		return Ok(0);
+	},
+
+	async close(handle) {
+		return true;
+	},
+
+	async read(handle, count, offset) {
+		return Ok(new Uint8Array());
+	},
+
+	async write(handle, buffer, count, offset) {
+		return Ok(0);
+	},
 };
 
-async function handleSyscalls(packet: SyscallPacket) {
-	let syscallName = packet.type.split('kernel.syscall.')[1];
+async function handleSyscalls(packet: syscall.Packet) {
+	let syscallName = packet.type.split('kernel.fs.')[1];
 
 	let entries = Object.entries(syscalls);
 
@@ -33,7 +50,7 @@ export function initSyscalls() {
 		if (td.type == undefined && td.data == undefined)
 			return;
 
-		const data: SyscallPacket = td;
+		const data: syscall.Packet = td;
 
 		if (data.type.startsWith('kernel.syscall.processInit')) {
 			await syscalls.processInit.bind(data.data[0])(data.data[1]);

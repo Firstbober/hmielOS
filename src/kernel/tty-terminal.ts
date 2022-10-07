@@ -1,3 +1,7 @@
+import { getAllProcesses } from './process';
+getAllProcesses();
+
+/*
 import { Terminal } from 'xterm';
 import 'xterm/css/xterm.css';
 import { FitAddon } from 'xterm-addon-fit';
@@ -14,7 +18,7 @@ async function evalTerminal(term: Terminal, line: string) {
 				return;
 			}
 
-			let handle = fs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, fs.FileAccessFlag.WriteOnly, fs.FileStatusFlag.Create);
+			let handle = sysfs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create);
 			if (!handle.ok) {
 				term.writeln(handle.error.name);
 				return;
@@ -23,7 +27,7 @@ async function evalTerminal(term: Terminal, line: string) {
 		},
 
 		'ls': async (params: Array<string>) => {
-			let fh = fs.opendir(params.length > 0 ? params[0] : '/');
+			let fh = sysfs.opendir(params.length > 0 ? params[0] : '/');
 
 			if (!fh.ok)
 				return term.writeln(fh.error.name);
@@ -93,7 +97,7 @@ async function evalTerminal(term: Terminal, line: string) {
 				return term.writeln('Usage: write <filename> <data>');
 			}
 
-			let handle = fs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, fs.FileAccessFlag.WriteOnly);
+			let handle = sysfs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, sysfs.open.AccessFlag.WriteOnly);
 			if (!handle.ok) {
 				term.writeln(handle.error.name);
 				return;
@@ -114,7 +118,7 @@ async function evalTerminal(term: Terminal, line: string) {
 				return term.writeln('Usage: read <filename>');
 			}
 
-			let handle = fs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, fs.FileAccessFlag.ReadOnly);
+			let handle = sysfs.open(params[0].startsWith('/') ? params[0] : `/${params[0]}`, sysfs.open.AccessFlag.ReadOnly);
 			if (!handle.ok) {
 				term.writeln(handle.error.name);
 				return;
@@ -238,3 +242,4 @@ export function startTerminalOnTTY(tty: number) {
 		term.write(e.key);
 	});
 }
+*/

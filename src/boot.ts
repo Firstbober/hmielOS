@@ -1,9 +1,11 @@
+import { syscall } from "libsys";
 import { createExecutableFromURL } from "./kernel/exec";
-import { fs } from "./kernel/fs";
+import { krnlfs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";
 import { initSyscalls } from "./kernel/syscall";
 import { createTTYOnDisplay } from "./kernel/tty";
-import { Result } from "./result";
+import { Result } from "libsys/result";
+import { sysfs } from "libsys/fs";
 
 function panic(message: string) {
 	const m = `KERNEL PANIC: ${message}`;
@@ -29,11 +31,11 @@ const console = {
 
 console.log("Creating root directory structure...");
 
-fs.mkdir('/system', true, [true, false, true]);
-fs.mkdir('/system/devices', true, [true, true, false]);
-fs.mkdir('/system/programs', true);
+krnlfs.mkdir('/system', true, [true, false, true]);
+krnlfs.mkdir('/system/devices', true, [true, true, false]);
+krnlfs.mkdir('/system/programs', true);
 
-fs.mkdir('/home', true, [true, true, true]);
+krnlfs.mkdir('/home', true, [true, true, true]);
 
 /**
  * Create TTY
@@ -45,13 +47,13 @@ let tty: number | Result<number> = createTTYOnDisplay(0)
 if (!tty.ok)
 	throw panic('Cannot create TTY');
 
-const ttyStdout = fs.open('/system/devices/tty/0', fs.FileAccessFlag.WriteOnly, fs.FileStatusFlag.Normal, fs.OpenType.Functional);
+const ttyStdout = krnlfs.open('/system/devices/tty/0', sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Functional);
 if (!ttyStdout.ok)
 	throw panic('aa')
 
 
 console.log = async (...data: any[]) => {
-	await fs.write(ttyStdout.value, new TextEncoder().encode(data.join(' ') + '\r\n'), -1, 0);
+	await krnlfs.write(ttyStdout.value, new TextEncoder().encode(data.join(' ') + '\r\n'), -1, 0);
 	window.console.log(...data);
 }
 
@@ -64,16 +66,16 @@ console.log = async (...data: any[]) => {
 	await console.log('Writing basic applications into filesystem...');
 
 	async function writeToFS(path: string, data: Uint8Array) {
-		const handle = fs.open(path, fs.FileAccessFlag.WriteOnly, fs.FileStatusFlag.Create);
+		const handle = krnlfs.open(path, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create);
 		if (!handle.ok)
 			return;
 
-		await fs.write(handle.value, data, -1, 0);
-		fs.close(handle.value);
+		await krnlfs.write(handle.value, data, -1, 0);
+		krnlfs.close(handle.value);
 	}
 
-	const sysinit = "./src/base/sysinit/index.html";
-	await writeToFS('/system/programs/sysinit', createExecutableFromURL(sysinit));
+	const sysinit = createExecutableFromURL("./src/base/sysinit/index.html");
+	await writeToFS('/system/programs/sysinit', sysinit);
 
 	/**
 	 * Init syscalls
@@ -87,7 +89,7 @@ console.log = async (...data: any[]) => {
 
 	await console.log("Starting sysinit...");
 
-	let spawnedProcess = spawnProcess(sysinit, -1);
+	let spawnedProcess = spawnProcess(new TextDecoder().decode(Uint8Array.from(JSON.parse(new TextDecoder().decode(sysinit)).data)), -1);
 
 	if (!spawnedProcess.ok)
 		panic('Cannot spawn sysinit');

@@ -1,9 +1,11 @@
+import { syscall } from "libsys";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import 'xterm/css/xterm.css'
 
-import { Result, Ok, Err } from "../result";
-import { fs } from "./fs";
+import { Result, Ok, Err } from "libsys/result";
+import { krnlfs } from "./fs";
+import { sysfs } from "libsys/fs";
 
 let ttyMap: Map<number, HTMLElement> = new Map();
 
@@ -30,12 +32,12 @@ async function runTTY(ttyId: number) {
 	term.write('hmielOS v0.1.0 $ ');
 	*/
 
-	let ttyFile = fs.open(`/system/devices/tty/${ttyId}`, fs.FileAccessFlag.ReadWrite);
+	let ttyFile = krnlfs.open(`/system/devices/tty/${ttyId}`, sysfs.open.AccessFlag.ReadWrite);
 	if (!ttyFile.ok)
 		return term.writeln(`Cannot open '/system/devices/tty/${ttyId}'`);
 
 	while (true) {
-		let data = await fs.read(ttyFile.value, -1, 0);
+		let data = await krnlfs.read(ttyFile.value, -1, 0);
 
 		if (data.ok) {
 			term.write(new TextDecoder().decode(data.value));
@@ -63,12 +65,12 @@ export function createTTYOnDisplay(display: number): Result<number> {
 	displayEl.innerHTML = "";
 	displayEl.appendChild(ttyEl);
 
-	fs.mkdir('/system/devices/tty');
-	let h = fs.open(`/system/devices/tty/${ttyId}`, fs.FileAccessFlag.WriteOnly, fs.FileStatusFlag.Create, fs.OpenType.Functional);
+	krnlfs.mkdir('/system/devices/tty');
+	let h = krnlfs.open(`/system/devices/tty/${ttyId}`, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create, sysfs.open.Type.Functional);
 	if (!h.ok)
 		return h;
 
-	fs.close(h.value);
+	krnlfs.close(h.value);
 	ttyMap.set(ttyId, ttyEl);
 
 	runTTY(ttyId);
