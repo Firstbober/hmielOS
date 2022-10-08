@@ -16,7 +16,6 @@ const syscalls: syscall.Syscalls = {
 	async open(path, accessFlag, statusFlag, type) {
 		let process = this as unknown as [PID, Process];
 
-		console.log(`Process wants to open ${path}`, this);
 		let krnlHandle = krnlfs.open(path, accessFlag, statusFlag, type);
 		if (!krnlHandle.ok)
 			return krnlHandle;
@@ -29,14 +28,26 @@ const syscalls: syscall.Syscalls = {
 	},
 
 	async close(handle) {
-		return true;
+		let process = this as unknown as [PID, Process];
+
+		let procHandle = process[1].fileHandlers.at(handle);
+		if(procHandle == undefined)
+			return false;
+
+		let r = krnlfs.close(procHandle);
+		process[1].fileHandlers[procHandle] = undefined;
+		return r;
 	},
 
 	async read(handle, count, offset) {
+		let process = this as unknown as [PID, Process];
+
 		return Ok(new Uint8Array());
 	},
 
 	async write(handle, buffer, count, offset) {
+		let process = this as unknown as [PID, Process];
+
 		return Ok(0);
 	},
 };

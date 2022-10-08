@@ -11,4 +11,8 @@ libsysInit().then(async () => {
 	);
 
 	console.log(test);
+	if(!test.ok)
+		return;
+
+	console.log(await syscall.syscalls.close(test.value));
 });
