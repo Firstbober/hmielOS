@@ -3,9 +3,9 @@ import { sysfs } from "libsys/fs";
 import { Err, Ok, Result } from "libsys/result";
 import { krnlfs } from "./fs";
 
-type PID = number;
+export type PID = number;
 
-interface Process {
+export interface Process {
 	parent: PID,
 	url: string,
 	iframe: HTMLIFrameElement,

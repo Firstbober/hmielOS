@@ -1,6 +1,7 @@
-import { acceptProcess, getProcessWithToken } from "./process"
+import { acceptProcess, getProcessWithToken, PID, Process } from "./process"
 import { syscall } from 'libsys';
 import { Ok } from "libsys/result";
+import { krnlfs } from "./fs";
 
 const syscalls: syscall.Syscalls = {
 	async processInit(processKey) {
@@ -13,9 +14,18 @@ const syscalls: syscall.Syscalls = {
 	},
 
 	async open(path, accessFlag, statusFlag, type) {
-		console.log(`Process wants to open ${path}`, this);
+		let process = this as unknown as [PID, Process];
 
-		return Ok(0);
+		console.log(`Process wants to open ${path}`, this);
+		let krnlHandle = krnlfs.open(path, accessFlag, statusFlag, type);
+		if (!krnlHandle.ok)
+			return krnlHandle;
+
+		let procHandle = process[1].fileHandlers.findIndex((value) => value == undefined);
+		if (procHandle == -1)
+			procHandle = process[1].fileHandlers.push(krnlHandle.value) - 1;
+
+		return Ok(procHandle);
 	},
 
 	async close(handle) {
@@ -42,10 +52,15 @@ async function handleSyscalls(packet: syscall.Packet) {
 		}
 
 		let process = getProcessWithToken(packet.data[0]);
-		if(!process.ok)
+		if (!process.ok)
 			return;
 
-		await v.bind([process, packet.data[1]])(...(packet.data.slice(2)));
+		let ret = await v.bind(process.value)(...(packet.data.slice(2)));
+		process.value[1].iframe.contentWindow?.postMessage({
+			type: 'kernel.syscall.' + syscallName,
+			data: [packet.data[1], ret]
+		}, '*');
+
 		break;
 	}
 }
@@ -58,7 +73,7 @@ export function initSyscalls() {
 
 		const data: syscall.Packet = td;
 
-		if(data.data.length < 2)
+		if (data.data.length < 2)
 			return;
 
 		if (data.type.startsWith('kernel.syscall.processInit')) {
