@@ -103,9 +103,6 @@ export function acceptProcess(processKey: string): Result<Process, error.Process
 		}
 
 		processesWIP.splice(i, 1);
-
-		krnlfs.write(processes[pW.promisedPID]!.fileHandlers[1]!, new TextEncoder().encode('This is a message from acceptProcess!!!'), -1, 0);
-
 		return Ok(processes[pW.promisedPID]!);
 	}
 

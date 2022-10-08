@@ -14,5 +14,6 @@ libsysInit().then(async () => {
 	if(!test.ok)
 		return;
 
+	console.log(await syscall.syscalls.write(1, new TextEncoder().encode('Hello, world from sysinit process\r\n'), -1, 0));
 	console.log(await syscall.syscalls.close(test.value));
 });

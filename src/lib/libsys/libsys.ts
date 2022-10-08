@@ -65,15 +65,15 @@ export namespace syscall {
 			return sendSyscall('open', path, accessFlag, statusFlag, type);
 		},
 		async close(handle) {
-			return true;
+			return sendSyscall('close', handle);
 		},
 
 		async read(handle: sysfs.open.Handle, count: number, offset: number) {
-			return Ok(new Uint8Array());
+			return sendSyscall('read', handle, count, offset);
 		},
 
 		async write(handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) {
-			return Ok(0);
+			return sendSyscall('write', handle, buffer, count, offset);
 		},
 	};
 }

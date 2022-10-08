@@ -34,7 +34,7 @@ const syscalls: syscall.Syscalls = {
 		if(procHandle == undefined)
 			return false;
 
-		let r = krnlfs.close(procHandle);
+		const r = krnlfs.close(procHandle);
 		process[1].fileHandlers[procHandle] = undefined;
 		return r;
 	},
@@ -42,13 +42,21 @@ const syscalls: syscall.Syscalls = {
 	async read(handle, count, offset) {
 		let process = this as unknown as [PID, Process];
 
-		return Ok(new Uint8Array());
+		let procHandle = process[1].fileHandlers.at(handle);
+		if(procHandle == undefined)
+			procHandle = -9999;
+
+		return krnlfs.read(procHandle, count, offset);
 	},
 
 	async write(handle, buffer, count, offset) {
 		let process = this as unknown as [PID, Process];
 
-		return Ok(0);
+		let procHandle = process[1].fileHandlers.at(handle);
+		if(procHandle == undefined)
+			procHandle = -9999;
+
+		return krnlfs.write(procHandle, buffer, count, offset);
 	},
 };
 
