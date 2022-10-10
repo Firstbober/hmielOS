@@ -21,4 +21,28 @@ export namespace sysfs {
 			Virtual
 		}
 	}
+
+	export namespace entry {
+		export enum Type {
+			Directory,
+			File,
+			FunctionalFile
+		}
+
+		/// Read, write, execute
+		export type Attributes = [boolean, boolean, boolean];
+
+		export type Directory = { type: Type.Directory, name: string, attributes: Attributes, entries: Array<Entry> };
+		export type File = { type: Type.File, name: string, attributes: Attributes };
+		export type FunctionalFile = {
+			type: Type.FunctionalFile,
+			name: string,
+			attributes: Attributes
+		};
+
+		export type Entry =
+			| Directory
+			| File
+			| FunctionalFile;
+	}
 }

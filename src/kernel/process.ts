@@ -1,4 +1,3 @@
-import { syscall } from "libsys";
 import { sysfs } from "libsys/fs";
 import { Err, Ok, Result } from "libsys/result";
 import { krnlfs } from "./fs";
@@ -58,7 +57,7 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<sysfs.
 		if (!stdin.ok)
 			return stdin;
 
-		const stdout: Result<number> = krnlfs.open('/system/devices/tty/0', sysfs.open.AccessFlag.WriteOnly, undefined, sysfs.open.Type.Virtual);
+		const stdout: Result<number> = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, undefined, sysfs.open.Type.Virtual);
 		if (!stdout.ok)
 			return stdout;
 

@@ -2,6 +2,7 @@ import { acceptProcess, getProcessWithToken, PID, Process } from "./process"
 import { syscall } from 'libsys';
 import { Ok } from "libsys/result";
 import { krnlfs } from "./fs";
+import { sysfs } from "libsys/fs";
 
 const syscalls: syscall.Syscalls = {
 	async processInit(processKey) {
@@ -31,7 +32,7 @@ const syscalls: syscall.Syscalls = {
 		let process = this as unknown as [PID, Process];
 
 		let procHandle = process[1].fileHandlers.at(handle);
-		if(procHandle == undefined)
+		if (procHandle == undefined)
 			return false;
 
 		const r = krnlfs.close(procHandle);
@@ -43,7 +44,7 @@ const syscalls: syscall.Syscalls = {
 		let process = this as unknown as [PID, Process];
 
 		let procHandle = process[1].fileHandlers.at(handle);
-		if(procHandle == undefined)
+		if (procHandle == undefined)
 			procHandle = -9999;
 
 		return krnlfs.read(procHandle, count, offset);
@@ -53,10 +54,62 @@ const syscalls: syscall.Syscalls = {
 		let process = this as unknown as [PID, Process];
 
 		let procHandle = process[1].fileHandlers.at(handle);
-		if(procHandle == undefined)
+		if (procHandle == undefined)
 			procHandle = -9999;
 
 		return krnlfs.write(procHandle, buffer, count, offset);
+	},
+
+	async opendir(path) {
+		let process = this as unknown as [PID, Process];
+
+		let krnlHandle = krnlfs.opendir(path);
+		if (!krnlHandle.ok)
+			return krnlHandle;
+
+		let procHandle = process[1].fileHandlers.findIndex((value) => value == undefined);
+		if (procHandle == -1)
+			procHandle = process[1].fileHandlers.push(krnlHandle.value) - 1;
+
+		return Ok(procHandle);
+	},
+
+	async readdir(handle) {
+		let process = this as unknown as [PID, Process];
+
+		let procHandle = process[1].fileHandlers.at(handle);
+		if (procHandle == undefined)
+			procHandle = -9999;
+
+		let r = krnlfs.readdir(procHandle);
+		if (!r.ok)
+			return r;
+
+		let a: Array<sysfs.entry.Entry> = [];
+		for (const entry of r.value) {
+			let e: sysfs.entry.Directory | sysfs.entry.Directory | sysfs.entry.FunctionalFile = {
+				type: entry.type,
+				name: entry.name,
+				attributes: entry.attributes
+			} as any;
+
+			if (entry.type == sysfs.entry.Type.Directory) {
+				let eEntries: Array<sysfs.entry.Entry> = [];
+				for (const eE of entry.entries) {
+					eEntries.push({
+						type: eE.type,
+						name: eE.name,
+						attributes: eE.attributes
+					} as any);
+				}
+
+				(e as sysfs.entry.Directory).entries = eEntries;
+			}
+
+			a.push(e);
+		}
+
+		return Ok(a);
 	},
 };
 

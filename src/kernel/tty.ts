@@ -1,4 +1,3 @@
-import { syscall } from "libsys";
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import 'xterm/css/xterm.css'
@@ -32,9 +31,9 @@ async function runTTY(ttyId: number) {
 	term.write('hmielOS v0.1.0 $ ');
 	*/
 
-	let ttyFile = krnlfs.open(`/system/devices/tty/${ttyId}`, sysfs.open.AccessFlag.ReadWrite);
+	let ttyFile = krnlfs.open(`/system/device/tty/${ttyId}`, sysfs.open.AccessFlag.ReadWrite);
 	if (!ttyFile.ok)
-		return term.writeln(`Cannot open '/system/devices/tty/${ttyId}'`);
+		return term.writeln(`Cannot open '/system/device/tty/${ttyId}'`);
 
 	while (true) {
 		let data = await krnlfs.read(ttyFile.value, -1, 0);
@@ -65,8 +64,8 @@ export function createTTYOnDisplay(display: number): Result<number> {
 	displayEl.innerHTML = "";
 	displayEl.appendChild(ttyEl);
 
-	krnlfs.mkdir('/system/devices/tty');
-	let h = krnlfs.open(`/system/devices/tty/${ttyId}`, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create, sysfs.open.Type.Functional);
+	krnlfs.mkdir('/system/device/tty');
+	let h = krnlfs.open(`/system/device/tty/${ttyId}`, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create, sysfs.open.Type.Functional);
 	if (!h.ok)
 		return h;
 

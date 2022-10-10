@@ -1,5 +1,5 @@
 import { sysfs } from "./fs";
-import { Ok, Result } from "./result";
+import { PromiseResult } from "./result";
 
 interface ResponsePromise {
 	promiseResolve: (value: any | PromiseLike<any>) => void,
@@ -16,11 +16,14 @@ export namespace syscall {
 	export interface Syscalls {
 		processInit: (processKey: string) => Promise<void>,
 
-		open: (path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag, type: sysfs.open.Type) => Promise<Result<sysfs.open.Handle>>,
+		open: (path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag, type: sysfs.open.Type) => PromiseResult<sysfs.open.Handle>,
 		close: (handle: sysfs.open.Handle) => Promise<boolean>,
 
-		read: (handle: sysfs.open.Handle, count: number, offset: number) => Promise<Result<Uint8Array>>,
-		write: (handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) => Promise<Result<number>>,
+		read: (handle: sysfs.open.Handle, count: number, offset: number) => PromiseResult<Uint8Array>,
+		write: (handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) => PromiseResult<number>,
+
+		opendir: (path: string) => PromiseResult<sysfs.open.Handle>,
+		readdir: (handle: sysfs.open.Handle) => PromiseResult<Array<sysfs.entry.Entry>>
 	}
 
 	export interface Packet {
@@ -74,6 +77,13 @@ export namespace syscall {
 
 		async write(handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) {
 			return sendSyscall('write', handle, buffer, count, offset);
+		},
+
+		async opendir(path) {
+			return sendSyscall('opendir', path);
+		},
+		async readdir(handle) {
+			return sendSyscall('readdir', handle);
 		},
 	};
 }

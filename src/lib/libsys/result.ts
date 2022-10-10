@@ -2,6 +2,8 @@ export type Result<T, E = Error> =
 	| { ok: true; value: T }
 	| { ok: false; error: E };
 
+export type PromiseResult<T, E = Error> = Promise<Result<T, E>>;
+
 export const Ok = <T>(value: T): { ok: true; value: T } => {
 	return { ok: true, value };
 }

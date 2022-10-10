@@ -1,4 +1,3 @@
-import { syscall } from "libsys";
 import { createExecutableFromURL } from "./kernel/exec";
 import { krnlfs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";
@@ -25,15 +24,16 @@ const console = {
  * /system - immutable base
  *   - programs
  *   - devices
- *   - config
+ *   - configs
  * /home - rwx for all
  */
 
 console.log("Creating root directory structure...");
 
 krnlfs.mkdir('/system', true, [true, false, true]);
-krnlfs.mkdir('/system/devices', true, [true, true, false]);
-krnlfs.mkdir('/system/programs', true);
+krnlfs.mkdir('/system/device', true, [true, true, false]);
+krnlfs.mkdir('/system/config', true);
+krnlfs.mkdir('/system/program', true);
 
 krnlfs.mkdir('/home', true, [true, true, true]);
 
@@ -47,7 +47,7 @@ let tty: number | Result<number> = createTTYOnDisplay(0)
 if (!tty.ok)
 	throw panic('Cannot create TTY');
 
-const ttyStdout = krnlfs.open('/system/devices/tty/0', sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Functional);
+const ttyStdout = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Functional);
 if (!ttyStdout.ok)
 	throw panic('aa')
 
@@ -57,25 +57,39 @@ console.log = async (...data: any[]) => {
 	window.console.log(...data);
 }
 
+import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
+
 (async () => {
 
 	/**
-	 * Write applications into filesystem
+	 * Write applications and configs into filesystem
 	 */
 
 	await console.log('Writing basic applications into filesystem...');
 
 	async function writeToFS(path: string, data: Uint8Array) {
-		const handle = krnlfs.open(path, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create);
+		const handle = krnlfs.open(path, sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Create, undefined, true);
 		if (!handle.ok)
 			return;
 
-		await krnlfs.write(handle.value, data, -1, 0);
+		await krnlfs.write(handle.value, data, -1, 0, undefined, true);
 		krnlfs.close(handle.value);
 	}
 
+	function toUint8Array(text: string) {
+		return new TextEncoder().encode(text);
+	}
+
 	const sysinit = createExecutableFromURL("./src/base/sysinit/index.html");
-	await writeToFS('/system/programs/sysinit', sysinit);
+	{
+
+		await writeToFS('/system/program/sysinit', sysinit);
+		krnlfs.mkdir('/system/config/sysinit/unit', true);
+
+		await writeToFS('/system/config/sysinit/unit/shell.unit', toUint8Array(sysinit_unit_shell));
+	}
+
+
 
 	/**
 	 * Init syscalls
