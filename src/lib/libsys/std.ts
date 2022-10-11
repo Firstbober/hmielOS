@@ -5,6 +5,6 @@ const textEncoder = new TextEncoder();
 
 export namespace std {
 	export async function print(...data: any[]) {
-		await syscall.syscalls.write(sysfs.open.StdOut, textEncoder.encode(data.join(' ') + '\r'), -1, 0);
+		await syscall.syscalls.write(sysfs.open.StdOut, textEncoder.encode(data.join(' ') + '\r\n'), -1, 0);
 	}
 }

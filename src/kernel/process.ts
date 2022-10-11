@@ -25,7 +25,7 @@ export namespace error {
 	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
 }
 
-export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<sysfs.open.Handle> = []): Result<PID> {
+export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.open.Handle> = []): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
@@ -51,7 +51,34 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<sysfs.
 	let wipPID = processesWIP.length;
 
 	if (parent != -1) {
-		// TODO
+		let fhs = [0, 1, 2, ...fhToClone];
+
+		for (const fh of fhs) {
+			const krnlFH = processes[parent]?.fileHandlers[fh];
+			const dscr = krnlfs.getFileDescriptor(krnlFH!);
+
+			if (!dscr.ok)
+				return dscr;
+
+			let copy: Result<sysfs.open.Handle> | null = null;
+
+			if (dscr.value.type == sysfs.entry.Type.Directory) {
+				copy = krnlfs.opendir(dscr.value.path, krnlFH);
+			} else {
+				copy = krnlfs.open(
+					dscr.value.path,
+					dscr.value.accessFlag,
+					dscr.value.statusFlag,
+					dscr.value.virtual ? sysfs.open.Type.Virtual : dscr.value.type == sysfs.entry.Type.File ? sysfs.open.Type.Normal : sysfs.open.Type.Functional,
+					undefined, krnlFH
+				);
+			}
+
+			if (!copy.ok)
+				return copy;
+
+			process.fileHandlers[fh] = copy.value;
+		}
 	} else {
 		const stdin: Result<number> = krnlfs.open('stdin', sysfs.open.AccessFlag.ReadWrite, undefined, sysfs.open.Type.Virtual);
 		if (!stdin.ok)
@@ -67,8 +94,6 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<sysfs.
 		process.fileHandlers.push(stdout.value);
 		process.fileHandlers.push(stderr);
 	}
-
-	// TODO: Add file handler cloning
 
 	processesWIP.push({
 		...process,

@@ -14,7 +14,8 @@ const ThrowResult = <T, E>(result: Result<T, E>) => {
 interface Unit {
 	name: string,
 	description: string,
-	exec: string
+	exec: string,
+	pid?: number
 }
 
 libsysInit().then(async () => {
@@ -69,7 +70,7 @@ libsysInit().then(async () => {
 		let unitWantedBy = contentTable.Unit.WantedBy;
 
 		if(Object.values(unit).includes(undefined) || unitWantedBy == undefined || unitTable == undefined) {
-			await std.print(`Unit file '${unitFile}' is invalid. Skipping...\n`);
+			await std.print(`Unit file '${unitFile}' is invalid. Skipping...`);
 			continue;
 		}
 
@@ -80,11 +81,20 @@ libsysInit().then(async () => {
 		}
 	}
 
-	await std.print("Got", dependencyTree["boot.target"].length, "unit(s) in boot.target.\n");
+	await std.print("Got", dependencyTree["boot.target"].length, "unit(s) in boot.target.");
 
 	/**
 	 * Spawn necessary units listed in dependency tree
 	 */
 
-	// TODO
+	for(const unit of dependencyTree["boot.target"]) {
+		const pid = await syscall.syscalls.exec(unit.exec, [], []);
+
+		if(!pid.ok) {
+			await std.print(`Failed to spawn unit '${unit.name}'(${unit.exec}). Got '${pid.error}'. Skipping...`);
+			continue;
+		}
+
+		unit.pid = pid.value;
+	}
 });

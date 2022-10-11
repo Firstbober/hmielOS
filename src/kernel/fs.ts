@@ -31,7 +31,9 @@ interface FSFileDescriptor {
 	type: sysfs.entry.Type,
 	virtual: boolean,
 	path: string,
-	entry: FSEntry
+	entry: FSEntry,
+	copyOf?: number,
+
 	accessFlag: sysfs.open.AccessFlag,
 	statusFlag: sysfs.open.StatusFlag
 }
@@ -42,8 +44,8 @@ let performingOpsOn: Map<sysfs.open.Handle, undefined> = new Map();
 
 export namespace krnlfs {
 	export namespace error {
-		export class NoSuchEntry extends Error { name: string = 'NoSuchEntry'; constructor() { super("Such entry doesn't exists") } }
-		export class NoSuchFileHandle extends Error { name: string = 'NoSuchFileHandle'; constructor() { super("Such FileHandle doesn't exists") } }
+		export class NoSuchEntry extends Error { name: string = 'NoSuchEntry'; constructor() { super("Such entry doesn't exist") } }
+		export class NoSuchFileHandle extends Error { name: string = 'NoSuchFileHandle'; constructor() { super("Such FileHandle doesn't exist") } }
 		export class EntryExists extends Error { name: string = 'EntryExists'; constructor() { super('Entry already exists') } }
 		export class InvalidEntryType extends Error {
 			name: string = 'InvalidEntryType';
@@ -132,7 +134,7 @@ export namespace krnlfs {
 		return sysfs.open.AccessFlag.None
 	}
 
-	function getFileDescriptor(fh: sysfs.open.Handle): Result<FSFileDescriptor> {
+	export function getFileDescriptor(fh: sysfs.open.Handle): Result<FSFileDescriptor> {
 		if (!fileDescriptors.has(fh))
 			return Err(new error.NoSuchFileHandle());
 
@@ -140,13 +142,13 @@ export namespace krnlfs {
 		return Ok(fd);
 	}
 
-	export function open(path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag = sysfs.open.StatusFlag.Normal, type: sysfs.open.Type = sysfs.open.Type.Normal, _permIgnore = false): Result<sysfs.open.Handle> {
+	export function open(path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag = sysfs.open.StatusFlag.Normal, type: sysfs.open.Type = sysfs.open.Type.Normal, _permIgnore = false, _copy: number | undefined = undefined): Result<sysfs.open.Handle> {
 		if (type == sysfs.open.Type.Virtual) {
 			let fileHandle = getNewFileHandle()
 
 			fileDescriptors.set(fileHandle, {
 				type: sysfs.entry.Type.FunctionalFile,
-				virtual: false,
+				virtual: true,
 				entry: {
 					type: sysfs.entry.Type.FunctionalFile,
 					name: 'virtual',
@@ -156,7 +158,8 @@ export namespace krnlfs {
 				},
 				path,
 				accessFlag,
-				statusFlag
+				statusFlag,
+				copyOf: _copy
 			});
 
 			return Ok(fileHandle);
@@ -200,7 +203,8 @@ export namespace krnlfs {
 			entry,
 			path,
 			accessFlag,
-			statusFlag
+			statusFlag,
+			copyOf: _copy
 		});
 
 		return Ok(fileHandle);
@@ -210,7 +214,7 @@ export namespace krnlfs {
 		return fileDescriptors.delete(fh);
 	}
 
-	export function opendir(path: string): Result<sysfs.open.Handle> {
+	export function opendir(path: string, _copy: number | undefined = undefined): Result<sysfs.open.Handle> {
 		const foundEntry = getEntry(path);
 
 		if (!foundEntry.ok)
@@ -224,7 +228,8 @@ export namespace krnlfs {
 			entry: foundEntry.value[0],
 			path,
 			accessFlag: attributesIntoFlag(foundEntry.value[0].attributes),
-			statusFlag: sysfs.open.StatusFlag.Normal
+			statusFlag: sysfs.open.StatusFlag.Normal,
+			copyOf: _copy
 		});
 
 		return Ok(fileHandle);
@@ -347,7 +352,11 @@ export namespace krnlfs {
 			if (entry.type == sysfs.entry.Type.FunctionalFile) {
 				if (!_fnRec)
 					for (const [_, v] of fileDescriptors.entries()) {
-						if (v.path == _fd.path) {
+						if (v.path == _fd.path && !v.virtual) {
+							return write(_, buffer, count, offset, true);
+						}
+
+						if(v.virtual && v.copyOf == fh) {
 							return write(_, buffer, count, offset, true);
 						}
 					}

@@ -89,7 +89,10 @@ import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
 		await writeToFS('/system/config/sysinit/unit/shell.unit', toUint8Array(sysinit_unit_shell));
 	}
 
-
+	const hosh = createExecutableFromURL('./src/base/hosh/index.html');
+	{
+		await writeToFS('/system/program/hosh', hosh);
+	}
 
 	/**
 	 * Init syscalls

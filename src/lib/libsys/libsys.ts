@@ -1,3 +1,4 @@
+import { PID } from "../../kernel/process";
 import { sysfs } from "./fs";
 import { PromiseResult } from "./result";
 
@@ -23,7 +24,9 @@ export namespace syscall {
 		write: (handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) => PromiseResult<number>,
 
 		opendir: (path: string) => PromiseResult<sysfs.open.Handle>,
-		readdir: (handle: sysfs.open.Handle) => PromiseResult<Array<sysfs.entry.Entry>>
+		readdir: (handle: sysfs.open.Handle) => PromiseResult<Array<sysfs.entry.Entry>>,
+
+		exec: (path: string, args: string[], env: Array<[string, string]>) => PromiseResult<PID>;
 	}
 
 	export interface Packet {
@@ -74,7 +77,6 @@ export namespace syscall {
 		async read(handle: sysfs.open.Handle, count: number, offset: number) {
 			return sendSyscall('read', handle, count, offset);
 		},
-
 		async write(handle: sysfs.open.Handle, buffer: Uint8Array, count: number, offset: number) {
 			return sendSyscall('write', handle, buffer, count, offset);
 		},
@@ -84,6 +86,10 @@ export namespace syscall {
 		},
 		async readdir(handle) {
 			return sendSyscall('readdir', handle);
+		},
+
+		async exec(path, args, env) {
+			return sendSyscall('exec', path, args, env);
 		},
 	};
 }

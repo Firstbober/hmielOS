@@ -1,6 +1,6 @@
-import { acceptProcess, getProcessWithToken, PID, Process } from "./process"
+import { acceptProcess, getProcessWithToken, PID, Process, spawnProcess } from "./process"
 import { syscall } from 'libsys';
-import { Ok } from "libsys/result";
+import { Err, Ok } from "libsys/result";
 import { krnlfs } from "./fs";
 import { sysfs } from "libsys/fs";
 
@@ -110,6 +110,36 @@ const syscalls: syscall.Syscalls = {
 		}
 
 		return Ok(a);
+	},
+
+	async exec(path, _args, _env) {
+		let process = this as unknown as [PID, Process];
+
+		let fh = krnlfs.open(path, sysfs.open.AccessFlag.ReadOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Normal);
+
+		if (!fh.ok)
+			return fh;
+
+		let content = await krnlfs.read(fh.value, -1, 0);
+
+		if (!content.ok)
+			return content;
+
+		krnlfs.close(fh.value);
+
+		const decoder = new TextDecoder();
+		try {
+			let executable = JSON.parse(decoder.decode(content.value));
+			let url = decoder.decode(Uint8Array.from(executable.data));
+
+			const pid = spawnProcess(url, process[0]);
+			if(!pid.ok)
+				return pid;
+
+			return Ok(pid.value);
+		} catch (error) {
+			return Err(new Error('Not Executable'));
+		}
 	},
 };
 
