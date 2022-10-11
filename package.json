@@ -18,6 +18,7 @@
     "vite": "^3.1.0"
   },
   "dependencies": {
+    "@ltd/j-toml": "^1.35.2",
     "libsys": "file:src/lib/libsys",
     "path-browserify": "^1.0.1",
     "xterm": "^5.0.0",

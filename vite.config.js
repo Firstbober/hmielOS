@@ -12,8 +12,14 @@ fs.readdirSync(resolve(__dirname, 'src/base')).forEach(dir => {
 
 export default defineConfig({
   build: {
+    target: 'es2020',
     rollupOptions: {
       input: rollupInput
     },
+  },
+  optimizeDeps: {
+    esbuildOptions: {
+      target: 'es2020'
+    }
   }
 })

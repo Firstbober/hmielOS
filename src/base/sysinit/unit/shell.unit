@@ -1,0 +1,5 @@
+[Unit]
+Name = "shell"
+Description = "A hosh shell for hmielOS"
+Exec = "/system/program/hosh"
+WantedBy = "boot.target"

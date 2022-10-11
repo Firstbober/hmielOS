@@ -1,30 +1,31 @@
-import { Err, Ok, Result } from "../result";
-import { fs } from "./fs";
+import { sysfs } from "libsys/fs";
+import { Err, Ok, Result } from "libsys/result";
+import { krnlfs } from "./fs";
 
-type PID = number;
+export type PID = number;
 
-interface Process {
+export interface Process {
 	parent: PID,
 	url: string,
 	iframe: HTMLIFrameElement,
 	processToken: string,
 
-	fileHandlers: Array<fs.FileHandle>
+	fileHandlers: Array<sysfs.open.Handle | undefined>
 }
 
 interface ProcessWIP extends Process {
 	promisedPID: PID
 }
 
-let processesWIP: Array<ProcessWIP> = [];
-let processes: Array<Process> = [];
+let processesWIP: Array<ProcessWIP | undefined> = [];
+let processes: Array<Process | undefined> = [];
 
 export namespace error {
 	export class ProcessError extends Error { name: string = 'ProcessError'; }
 	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
 }
 
-export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<fs.FileHandle> = []): Result<PID> {
+export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.open.Handle> = []): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
@@ -50,13 +51,40 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<fs.Fil
 	let wipPID = processesWIP.length;
 
 	if (parent != -1) {
-		// TODO
+		let fhs = [0, 1, 2, ...fhToClone];
+
+		for (const fh of fhs) {
+			const krnlFH = processes[parent]?.fileHandlers[fh];
+			const dscr = krnlfs.getFileDescriptor(krnlFH!);
+
+			if (!dscr.ok)
+				return dscr;
+
+			let copy: Result<sysfs.open.Handle> | null = null;
+
+			if (dscr.value.type == sysfs.entry.Type.Directory) {
+				copy = krnlfs.opendir(dscr.value.path, krnlFH);
+			} else {
+				copy = krnlfs.open(
+					dscr.value.path,
+					dscr.value.accessFlag,
+					dscr.value.statusFlag,
+					dscr.value.virtual ? sysfs.open.Type.Virtual : dscr.value.type == sysfs.entry.Type.File ? sysfs.open.Type.Normal : sysfs.open.Type.Functional,
+					undefined, krnlFH
+				);
+			}
+
+			if (!copy.ok)
+				return copy;
+
+			process.fileHandlers[fh] = copy.value;
+		}
 	} else {
-		const stdin: Result<number> = fs.open('stdin', fs.FileAccessFlag.ReadWrite, undefined, fs.OpenType.Virtual);
+		const stdin: Result<number> = krnlfs.open('stdin', sysfs.open.AccessFlag.ReadWrite, undefined, sysfs.open.Type.Virtual);
 		if (!stdin.ok)
 			return stdin;
 
-		const stdout: Result<number> = fs.open('/system/devices/tty/0', fs.FileAccessFlag.WriteOnly, undefined, fs.OpenType.Virtual);
+		const stdout: Result<number> = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, undefined, sysfs.open.Type.Virtual);
 		if (!stdout.ok)
 			return stdout;
 
@@ -66,8 +94,6 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<fs.Fil
 		process.fileHandlers.push(stdout.value);
 		process.fileHandlers.push(stderr);
 	}
-
-	// TODO: Add file handler cloning
 
 	processesWIP.push({
 		...process,
@@ -79,8 +105,8 @@ export function spawnProcess(url: string, _parent: PID, _fhToClone: Array<fs.Fil
 		if (processesWIP[wipPID] == undefined)
 			return;
 
-		processes.splice(promisedPID, 1);
-		processesWIP.splice(wipPID, 1);
+		processes[promisedPID] = undefined;
+		processesWIP[wipPID] = undefined;
 
 		document.getElementById('kernel/process/iframes')?.removeChild(iframe);
 		iframe.remove();
@@ -93,21 +119,35 @@ export function acceptProcess(processKey: string): Result<Process, error.Process
 	for (let i = 0; i < processesWIP.length; i++) {
 		const pW = processesWIP[i];
 
+		if (pW == undefined)
+			continue;
+
 		if (pW.processToken != processKey) {
 			continue;
 		}
 
 		processesWIP.splice(i, 1);
-
-		// TODO: Add syscalls for fs
-		fs.write(processes[pW.promisedPID].fileHandlers[1], new TextEncoder().encode('This is a message from acceptProcess!!!'), -1, 0);
-
-		return Ok(processes[pW.promisedPID]);
+		return Ok(processes[pW.promisedPID]!);
 	}
 
 	return Err(new error.NoSuchProcess());
 }
 
-export function getAllProcesses(): Array<Process> {
-	return processes;
+export function getAllProcesses(): Array<[PID, Process]> {
+	let procs: Array<[PID, Process]> = [];
+	for (let i = 0; i < processes.length; i++) {
+		const p = processes[i];
+		if (p != undefined)
+			procs.push([i, p]);
+	}
+	return procs;
+}
+
+export function getProcessWithToken(token: string): Result<[PID, Process], error.ProcessError> {
+	for (const process of getAllProcesses()) {
+		if (process[1].processToken == token)
+			return Ok(process);
+	}
+
+	return Err(new error.NoSuchProcess());
 }
