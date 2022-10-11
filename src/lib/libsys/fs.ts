@@ -2,6 +2,10 @@ export namespace sysfs {
 	export namespace open {
 		export type Handle = number;
 
+		export const StdIn = 0;
+		export const StdOut = 1;
+		export const StdErr = 2;
+
 		export enum AccessFlag {
 			None,
 			ReadOnly,
