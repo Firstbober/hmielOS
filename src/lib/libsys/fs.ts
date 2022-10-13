@@ -21,8 +21,7 @@ export namespace sysfs {
 
 		export enum Type {
 			Normal,
-			Functional,
-			Virtual
+			Functional
 		}
 	}
 

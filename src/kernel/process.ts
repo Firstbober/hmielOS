@@ -1,6 +1,7 @@
 import { sysfs } from "libsys/fs";
 import { Err, Ok, Result } from "libsys/result";
 import { krnlfs } from "./fs";
+import { getStdInFH } from "./tty";
 
 export type PID = number;
 
@@ -69,10 +70,12 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 					dscr.value.path,
 					dscr.value.accessFlag,
 					dscr.value.statusFlag,
-					dscr.value.virtual ? sysfs.open.Type.Virtual : dscr.value.type == sysfs.entry.Type.File ? sysfs.open.Type.Normal : sysfs.open.Type.Functional,
+					dscr.value.type == sysfs.entry.Type.File ? sysfs.open.Type.Normal : sysfs.open.Type.Functional,
 					undefined, krnlFH
 				);
 			}
+
+			console.log(copy);
 
 			if (!copy.ok)
 				return copy;
@@ -80,11 +83,21 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 			process.fileHandlers[fh] = copy.value;
 		}
 	} else {
-		const stdin: Result<number> = krnlfs.open('stdin', sysfs.open.AccessFlag.ReadWrite, undefined, sysfs.open.Type.Virtual);
+		const stdinFH = getStdInFH();
+		if (!stdinFH.ok)
+			return stdinFH;
+
+		const stdin: Result<number> = krnlfs.open(
+			'',
+			sysfs.open.AccessFlag.ReadOnly,
+			undefined,
+			sysfs.open.Type.Functional,
+			undefined, stdinFH.value
+		);
 		if (!stdin.ok)
 			return stdin;
 
-		const stdout: Result<number> = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, undefined, sysfs.open.Type.Virtual);
+		const stdout: Result<number> = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, undefined, sysfs.open.Type.Functional);
 		if (!stdout.ok)
 			return stdout;
 
