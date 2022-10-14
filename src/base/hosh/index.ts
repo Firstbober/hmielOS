@@ -21,6 +21,8 @@ function stringAsInData(str: string): InData {
 	}
 }
 
+async function interpretLineBuffer(lineBuffer: string) {}
+
 libsysInit().then(async () => {
 	const textDecoder = new TextDecoder();
 	const motdH = await syscall.syscalls.open('/system/config/motd', 1, 2, 0);
@@ -55,6 +57,9 @@ libsysInit().then(async () => {
 			case 'Enter':
 				await std.printraw("\n\r" + "[hmielOS]$ ");
 				currentLineIdx += 1;
+
+				await interpretLineBuffer(lines[currentLineIdx]);
+
 				lines[currentLineIdx] = ""
 				offsetLeft = 0;
 				offsetRight = 0;
