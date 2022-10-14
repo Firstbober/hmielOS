@@ -1,3 +1,14 @@
+/**
+ * hmielOS entry point really.
+ *
+ * Here we:
+ *  - Create basic directory structure for system.
+ *  - Create TTY.
+ *  - Write programs to filesystem.
+ *  - Init syscalls.
+ *  - Start sysinit.
+ */
+
 import { createExecutableFromURL } from "./kernel/exec";
 import { krnlfs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";
@@ -6,9 +17,10 @@ import { createTTYOnDisplay } from "./kernel/tty";
 import { Result } from "libsys/result";
 import { sysfs } from "libsys/fs";
 
-function panic(message: string) {
+function panic(message: string, error: Error) {
 	const m = `KERNEL PANIC: ${message}`;
 	window.alert(m);
+	window.console.error(error);
 	throw new Error(m)
 }
 
@@ -45,11 +57,11 @@ console.log('Creating tty...');
 
 let tty: number | Result<number> = createTTYOnDisplay(0)
 if (!tty.ok)
-	throw panic('Cannot create TTY');
+	throw panic('Cannot create TTY', tty.error);
 
 const ttyStdout = krnlfs.open('/system/device/tty/0', sysfs.open.AccessFlag.WriteOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Functional);
 if (!ttyStdout.ok)
-	throw panic('aa')
+	throw panic('aa', ttyStdout.error);
 
 
 console.log = async (...data: any[]) => {
@@ -58,6 +70,7 @@ console.log = async (...data: any[]) => {
 }
 
 import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
+import hosh_motd from './base/hosh/motd?raw';
 
 (async () => {
 
@@ -92,6 +105,7 @@ import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
 	const hosh = createExecutableFromURL('./src/base/hosh/index.html');
 	{
 		await writeToFS('/system/program/hosh', hosh);
+		await writeToFS('/system/config/motd', toUint8Array(hosh_motd));
 	}
 
 	/**
@@ -109,6 +123,6 @@ import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
 	let spawnedProcess = spawnProcess(new TextDecoder().decode(Uint8Array.from(JSON.parse(new TextDecoder().decode(sysinit)).data)), -1);
 
 	if (!spawnedProcess.ok)
-		panic('Cannot spawn sysinit');
+		panic('Cannot spawn sysinit', spawnedProcess.error);
 
 })()

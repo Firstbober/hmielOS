@@ -1,3 +1,9 @@
+/**
+ * kernel/syscall
+ *
+ * Here lies the implementation of all syscalls in the system.
+ */
+
 import { acceptProcess, getProcessWithToken, PID, Process, spawnProcess } from "./process"
 import { syscall } from 'libsys';
 import { Err, Ok } from "libsys/result";

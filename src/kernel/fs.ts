@@ -24,7 +24,14 @@ export let root: FSEntryDirectory = {
 	type: sysfs.entry.Type.Directory,
 	name: '/',
 	attributes: [true, false, true],
-	entries: []
+	entries: [
+		{
+			type: sysfs.entry.Type.Directory,
+			name: 'virtual',
+			attributes: [true, true, false],
+			entries: []
+		}
+	]
 };
 
 interface FSFileDescriptor {
@@ -142,27 +149,17 @@ export namespace krnlfs {
 		return Ok(fd);
 	}
 
-	export function open(path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag = sysfs.open.StatusFlag.Normal, type: sysfs.open.Type = sysfs.open.Type.Normal, _permIgnore = false, _copy: number | undefined = undefined): Result<sysfs.open.Handle> {
-		if (type == sysfs.open.Type.Virtual) {
-			let fileHandle = getNewFileHandle()
+	export function open(_path: string, accessFlag: sysfs.open.AccessFlag, _statusFlag: sysfs.open.StatusFlag = sysfs.open.StatusFlag.Normal, type: sysfs.open.Type = sysfs.open.Type.Normal, __permIgnore = false, _copy: number | undefined = undefined): Result<sysfs.open.Handle> {
+		let path = _path;
+		let _permIgnore = __permIgnore;
+		let statusFlag = _statusFlag;
 
-			fileDescriptors.set(fileHandle, {
-				type: sysfs.entry.Type.FunctionalFile,
-				virtual: true,
-				entry: {
-					type: sysfs.entry.Type.FunctionalFile,
-					name: 'virtual',
-					attributes: [true, true, true],
-					inOpQueue: -1,
-					data: new Uint8Array()
-				},
-				path,
-				accessFlag,
-				statusFlag,
-				copyOf: _copy
-			});
+		if (_copy != undefined) {
+			const descriptor = getFileDescriptor(_copy);
+			if (!descriptor.ok)
+				return descriptor;
 
-			return Ok(fileHandle);
+			path = descriptor.value.path;
 		}
 
 		const foundEntry = getEntry(path);
@@ -297,12 +294,14 @@ export namespace krnlfs {
 		if (fd.value.type == sysfs.entry.Type.Directory)
 			return Err(new error.IsADirectory())
 
-		if (type && !ignorePerm)
-			if (!fd.value.entry.attributes[1])
-				return Err(new error.OperationInaccessible('write'));
-		if (!type && !ignorePerm)
-			if (!fd.value.entry.attributes[0])
-				return Err(new error.OperationInaccessible('read'));
+		if (fd.value.accessFlag == sysfs.open.AccessFlag.ReadOnly)
+			if ((type && !ignorePerm))
+				if (!fd.value.entry.attributes[1])
+					return Err(new error.OperationInaccessible('write'));
+		if (fd.value.accessFlag == sysfs.open.AccessFlag.WriteOnly)
+			if (!type && !ignorePerm)
+				if (!fd.value.entry.attributes[0])
+					return Err(new error.OperationInaccessible('read'));
 
 
 		let entry = fd.value.entry as FSEntry;
@@ -351,12 +350,8 @@ export namespace krnlfs {
 
 			if (entry.type == sysfs.entry.Type.FunctionalFile) {
 				if (!_fnRec)
-					for (const [_, v] of fileDescriptors.entries()) {
-						if (v.path == _fd.path && !v.virtual) {
-							return write(_, buffer, count, offset, true);
-						}
-
-						if(v.virtual && v.copyOf == fh) {
+					for (const [_, _v] of fileDescriptors.entries()) {
+						if (_ == _fd.copyOf) {
 							return write(_, buffer, count, offset, true);
 						}
 					}

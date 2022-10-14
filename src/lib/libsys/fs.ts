@@ -1,3 +1,9 @@
+/**
+ * libsys/fs
+ *
+ * Filesystem types.
+ */
+
 export namespace sysfs {
 	export namespace open {
 		export type Handle = number;
@@ -21,8 +27,7 @@ export namespace sysfs {
 
 		export enum Type {
 			Normal,
-			Functional,
-			Virtual
+			Functional
 		}
 	}
 

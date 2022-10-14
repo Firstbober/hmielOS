@@ -19,6 +19,8 @@
   },
   "dependencies": {
     "@ltd/j-toml": "^1.35.2",
+    "@types/ansi-escape-sequences": "^4.0.0",
+    "ansi-escape-sequences": "^6.2.1",
     "libsys": "file:src/lib/libsys",
     "path-browserify": "^1.0.1",
     "xterm": "^5.0.0",
