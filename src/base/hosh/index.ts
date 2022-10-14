@@ -21,7 +21,7 @@ function stringAsInData(str: string): InData {
 	}
 }
 
-async function interpretLineBuffer(lineBuffer: string) {}
+async function interpretLineBuffer(_lineBuffer: string) {}
 
 libsysInit().then(async () => {
 	const textDecoder = new TextDecoder();
