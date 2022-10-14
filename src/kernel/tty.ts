@@ -37,7 +37,7 @@ async function runTTY(ttyId: number) {
 
 	const textEncoder = new TextEncoder();
 	term.onKey(async (e) => {
-		const data = `${e.domEvent.code};${+ e.domEvent.ctrlKey};${+ e.domEvent.altKey};${+ e.domEvent.shiftKey}`;
+		const data = `${e.domEvent.code}█${e.domEvent.key}█${+ e.domEvent.ctrlKey}█${+ e.domEvent.altKey}█${+ e.domEvent.shiftKey}`;
 		await krnlfs.write(stdinFH, textEncoder.encode(data), -1, 0);
 	});
 

@@ -75,8 +75,6 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 				);
 			}
 
-			console.log(copy);
-
 			if (!copy.ok)
 				return copy;
 

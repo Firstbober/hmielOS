@@ -59,6 +59,7 @@ console.log = async (...data: any[]) => {
 }
 
 import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
+import hosh_motd from './base/hosh/motd?raw';
 
 (async () => {
 
@@ -93,6 +94,7 @@ import sysinit_unit_shell from './base/sysinit/unit/shell.unit?raw';
 	const hosh = createExecutableFromURL('./src/base/hosh/index.html');
 	{
 		await writeToFS('/system/program/hosh', hosh);
+		await writeToFS('/system/config/motd', toUint8Array(hosh_motd));
 	}
 
 	/**
