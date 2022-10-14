@@ -1,36 +1,39 @@
+/**
+ * kernel/tty
+ *
+ * TTY implementation using xterm and html.
+ * Also here we create stdin and stdout file handles.
+ */
+
+// Init all xterm stuff
 import { Terminal } from "xterm";
 import { FitAddon } from "xterm-addon-fit";
 import 'xterm/css/xterm.css'
 
+// Our imports
 import { Result, Ok, Err } from "libsys/result";
 import { krnlfs } from "./fs";
 import { sysfs } from "libsys/fs";
 
 let ttyMap: Map<number, HTMLElement> = new Map();
 
+/// Start tty on previously established ID
 async function runTTY(ttyId: number) {
+	// Get tty html element
 	let ttyEl = getTTYElement(ttyId);
 	if (ttyEl.ok)
 		ttyEl.value.innerHTML = `<div id='core/tty/terminal' style='height: 100%'></div>`;
 
+	// Create xterm instance
 	const term = new Terminal();
 	const fitAddon = new FitAddon();
 
+	// Xterm magic
 	term.loadAddon(fitAddon);
 	term.open(document.getElementById('core/tty/terminal')!);
 	fitAddon.fit();
-	/*
-	let currentLine = '';
-	let bufferedLine = '';
-	let currentLineIdx = 0;
-	let lines: Array<string> = [];
 
-	term.writeln('Welcome to test terminal in hmielOS!');
-	term.writeln('WARNING This input is temporary and most things are hardcoded.');
-	term.writeln('Proper terminal will come when processes are done\n');
-	term.write('hmielOS v0.1.0 $ ');
-	*/
-
+	// Open stdout file
 	let ttyFile = krnlfs.open(`/system/device/tty/${ttyId}`, sysfs.open.AccessFlag.ReadWrite);
 	if (!ttyFile.ok)
 		return term.writeln(`Cannot open '/system/device/tty/${ttyId}'`);
@@ -41,6 +44,7 @@ async function runTTY(ttyId: number) {
 		await krnlfs.write(stdinFH, textEncoder.encode(data), -1, 0);
 	});
 
+	// Show on screen data from stdout
 	while (true) {
 		let data = await krnlfs.read(ttyFile.value, -1, 0);
 
@@ -52,6 +56,7 @@ async function runTTY(ttyId: number) {
 
 let stdinFH = -1;
 
+/// Create TTY on specified display
 export function createTTYOnDisplay(display: number): Result<number> {
 	let displayEl = document.getElementById(`core/display/${display}`);
 
@@ -98,6 +103,7 @@ export function getTTYElement(id: number): Result<HTMLElement> {
 	return Err(new Error(`TTY '${id} not found'`));
 }
 
+/// Get stdin file handle
 export function getStdInFH(): Result<sysfs.open.Handle> {
 	if (stdinFH == -1)
 		return Err(new Error('No stdin handle yet.'))

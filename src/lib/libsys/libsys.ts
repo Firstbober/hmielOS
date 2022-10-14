@@ -1,3 +1,10 @@
+/**
+ * libsys/libsys
+ *
+ * The core of libsys.
+ * Handles communication with kernel.
+ */
+
 import { PID } from "../../kernel/process";
 import { sysfs } from "./fs";
 import { PromiseResult } from "./result";

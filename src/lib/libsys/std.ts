@@ -1,3 +1,9 @@
+/**
+ * libsys/std
+ *
+ * Simple standard library with easy to use functions.
+ */
+
 import { sysfs } from "./fs";
 import { syscall } from "./libsys";
 

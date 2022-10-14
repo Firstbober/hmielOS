@@ -1,3 +1,14 @@
+/**
+ * hmielOS entry point really.
+ *
+ * Here we:
+ *  - Create basic directory structure for system.
+ *  - Create TTY.
+ *  - Write programs to filesystem.
+ *  - Init syscalls.
+ *  - Start sysinit.
+ */
+
 import { createExecutableFromURL } from "./kernel/exec";
 import { krnlfs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";

@@ -1,3 +1,9 @@
+/**
+ * libsys/result
+ *
+ * An error handling solution used all across hmielOS.
+ */
+
 export type Result<T, E = Error> =
 	| { ok: true; value: T }
 	| { ok: false; error: E };

@@ -31,6 +31,7 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
 
+	// Init iframe
 	iframe.height = "0";
 	(iframe as any).loading = "eager";
 	(iframe as any).fetchpriority = "high";
@@ -51,6 +52,8 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 	};
 	let wipPID = processesWIP.length;
 
+	// If parent isn't kernel then base
+	// file handle cloning off the kernel
 	if (parent != -1) {
 		let fhs = [0, 1, 2, ...fhToClone];
 
@@ -112,6 +115,8 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 	});
 	processes.push(process);
 
+	// If process doesn't respond after 60 seconds
+	// then remove it
 	setTimeout(() => {
 		if (processesWIP[wipPID] == undefined)
 			return;

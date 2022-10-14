@@ -1,3 +1,9 @@
+/**
+ * libsys/fs
+ *
+ * Filesystem types.
+ */
+
 export namespace sysfs {
 	export namespace open {
 		export type Handle = number;
