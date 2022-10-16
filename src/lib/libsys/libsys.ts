@@ -136,7 +136,13 @@ export async function libsysInit() {
 	})
 
 	_f_canUseSyscalls = true;
-	return await syscall.syscalls.processInit(prockey);
+	const rv = await syscall.syscalls.processInit(prockey);
+	return {
+		args: rv,
+		process: {
+			argv: rv
+		}
+	}
 }
 
 export default syscall.syscalls;

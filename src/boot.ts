@@ -108,6 +108,11 @@ import hosh_motd from './base/hosh/motd?raw';
 		await writeToFS('/system/config/motd', toUint8Array(hosh_motd));
 	}
 
+	const wasiwasm_runtime = exec.createExecutableFromURL('./src/base/wasiwasm.runtime/index.html');
+	{
+		await writeToFS('/system/program/wasiwasm.runtime', wasiwasm_runtime);
+	}
+
 	/**
 	 * Init syscalls
 	 */

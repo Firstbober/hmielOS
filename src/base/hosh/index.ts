@@ -21,7 +21,11 @@ function stringAsInData(str: string): InData {
 	}
 }
 
-async function interpretLineBuffer(_lineBuffer: string) {}
+async function interpretLineBuffer(_lineBuffer: string) {
+	if(_lineBuffer.includes("wwr")) {
+		await syscall.syscalls.exec('/system/program/wasiwasm.runtime', [], []);
+	}
+}
 
 libsysInit().then(async () => {
 	const textDecoder = new TextDecoder();
@@ -56,9 +60,9 @@ libsysInit().then(async () => {
 		switch (data.domCode) {
 			case 'Enter':
 				await std.printraw("\n\r" + "[hmielOS]$ ");
-				currentLineIdx += 1;
-
 				await interpretLineBuffer(lines[currentLineIdx]);
+
+				currentLineIdx += 1;
 
 				lines[currentLineIdx] = ""
 				offsetLeft = 0;
