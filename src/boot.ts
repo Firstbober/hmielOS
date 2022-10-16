@@ -9,7 +9,7 @@
  *  - Start sysinit.
  */
 
-import { createExecutableFromURL } from "./kernel/exec";
+import { exec } from "./kernel/exec";
 import { krnlfs } from "./kernel/fs";
 import { spawnProcess } from "./kernel/process";
 import { initSyscalls } from "./kernel/syscall";
@@ -93,7 +93,7 @@ import hosh_motd from './base/hosh/motd?raw';
 		return new TextEncoder().encode(text);
 	}
 
-	const sysinit = createExecutableFromURL("./src/base/sysinit/index.html");
+	const sysinit = exec.createExecutableFromURL("./src/base/sysinit/index.html");
 	{
 
 		await writeToFS('/system/program/sysinit', sysinit);
@@ -102,7 +102,7 @@ import hosh_motd from './base/hosh/motd?raw';
 		await writeToFS('/system/config/sysinit/unit/shell.unit', toUint8Array(sysinit_unit_shell));
 	}
 
-	const hosh = createExecutableFromURL('./src/base/hosh/index.html');
+	const hosh = exec.createExecutableFromURL('./src/base/hosh/index.html');
 	{
 		await writeToFS('/system/program/hosh', hosh);
 		await writeToFS('/system/config/motd', toUint8Array(hosh_motd));

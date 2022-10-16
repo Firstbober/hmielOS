@@ -22,7 +22,7 @@ let processKey = "";
 
 export namespace syscall {
 	export interface Syscalls {
-		processInit: (processKey: string) => Promise<void>,
+		processInit: (processKey: string) => Promise<string[]>,
 
 		open: (path: string, accessFlag: sysfs.open.AccessFlag, statusFlag: sysfs.open.StatusFlag, type: sysfs.open.Type) => PromiseResult<sysfs.open.Handle>,
 		close: (handle: sysfs.open.Handle) => Promise<boolean>,
@@ -136,7 +136,7 @@ export async function libsysInit() {
 	})
 
 	_f_canUseSyscalls = true;
-	await syscall.syscalls.processInit(prockey);
+	return await syscall.syscalls.processInit(prockey);
 }
 
 export default syscall.syscalls;

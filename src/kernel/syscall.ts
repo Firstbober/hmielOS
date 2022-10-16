@@ -4,11 +4,12 @@
  * Here lies the implementation of all syscalls in the system.
  */
 
-import { acceptProcess, getProcessWithToken, PID, Process, spawnProcess } from "./process"
+import { acceptProcess, getProcessWithToken, PID, Process } from "./process"
 import { syscall } from 'libsys';
-import { Err, Ok } from "libsys/result";
+import { Ok } from "libsys/result";
 import { krnlfs } from "./fs";
 import { sysfs } from "libsys/fs";
+import { exec } from "./exec";
 
 const syscalls: syscall.Syscalls = {
 	async processInit(processKey) {
@@ -16,8 +17,10 @@ const syscalls: syscall.Syscalls = {
 
 		if (p.ok) p.value.iframe.contentWindow?.postMessage({
 			type: 'kernel.syscall.processInit',
-			data: [(this as any)[1]]
+			data: [(this as any)[1], p.value.args]
 		}, '*');
+
+		return [];
 	},
 
 	async open(path, accessFlag, statusFlag, type) {
@@ -118,34 +121,10 @@ const syscalls: syscall.Syscalls = {
 		return Ok(a);
 	},
 
-	async exec(path, _args, _env) {
+	async exec(path, args, _env) {
 		let process = this as unknown as [PID, Process];
 
-		let fh = krnlfs.open(path, sysfs.open.AccessFlag.ReadOnly, sysfs.open.StatusFlag.Normal, sysfs.open.Type.Normal);
-
-		if (!fh.ok)
-			return fh;
-
-		let content = await krnlfs.read(fh.value, -1, 0);
-
-		if (!content.ok)
-			return content;
-
-		krnlfs.close(fh.value);
-
-		const decoder = new TextDecoder();
-		try {
-			let executable = JSON.parse(decoder.decode(content.value));
-			let url = decoder.decode(Uint8Array.from(executable.data));
-
-			const pid = spawnProcess(url, process[0]);
-			if(!pid.ok)
-				return pid;
-
-			return Ok(pid.value);
-		} catch (error) {
-			return Err(new Error('Not Executable'));
-		}
+		return await exec.executeFromFS(path, process[0], args);
 	},
 };
 

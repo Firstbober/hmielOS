@@ -11,7 +11,8 @@ export interface Process {
 	iframe: HTMLIFrameElement,
 	processToken: string,
 
-	fileHandlers: Array<sysfs.open.Handle | undefined>
+	fileHandlers: Array<sysfs.open.Handle | undefined>,
+	args: string[],
 }
 
 interface ProcessWIP extends Process {
@@ -26,7 +27,7 @@ export namespace error {
 	export class NoSuchProcess extends ProcessError { name: string = 'NoSuchProcess'; }
 }
 
-export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.open.Handle> = []): Result<PID> {
+export function spawnProcess(url: string, _parent: PID, args: Array<string> = [], fhToClone: Array<sysfs.open.Handle> = []): Result<PID> {
 	let iframe = document.createElement('iframe') as HTMLIFrameElement;
 	let uuid = crypto.randomUUID();
 	let promisedPID = processes.length;
@@ -48,7 +49,9 @@ export function spawnProcess(url: string, _parent: PID, fhToClone: Array<sysfs.o
 		url,
 		iframe,
 		processToken: uuid,
-		fileHandlers: []
+
+		fileHandlers: [],
+		args
 	};
 	let wipPID = processesWIP.length;
 
